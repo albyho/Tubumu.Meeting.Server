@@ -19,7 +19,7 @@ namespace Tubumu.Meeting.Server
         private readonly BadDisconnectSocketService _badDisconnectSocketService;
         private readonly Scheduler _scheduler;
 
-        private string UserId => Context.User.Identity.Name;
+        private string UserId => Context.UserIdentifier;
         private string ConnectionId => Context.ConnectionId;
 
         public MeetingHub(ILogger<MeetingHub> logger, IHubContext<MeetingHub, IPeer> hubContext, BadDisconnectSocketService badDisconnectSocketService, Scheduler scheduler)

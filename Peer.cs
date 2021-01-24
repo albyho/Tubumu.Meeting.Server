@@ -121,7 +121,7 @@ namespace Tubumu.Meeting.Server
             _sctpCapabilities = sctpCapabilities;
             PeerId = peerId;
             ConnectionId = connectionId;
-            DisplayName = displayName.NullOrWhiteSpaceReplace("Guest" + peerId.ToString().PadLeft(8, '0'));
+            DisplayName = displayName.NullOrWhiteSpaceReplace("User:" + peerId.ToString().PadLeft(8, '0'));
             Sources = sources ?? Array.Empty<string>();
             AppData = new ConcurrentDictionary<string, object>(appData ?? new Dictionary<string, object>());
             _pullPaddingsLock.Set();
