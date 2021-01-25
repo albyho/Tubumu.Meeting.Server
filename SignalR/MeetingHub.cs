@@ -217,7 +217,7 @@ namespace Tubumu.Meeting.Server
             transport.On("trace", trace =>
             {
                 var traceData = (TransportTraceEventData)trace!;
-                _logger.LogDebug($"transport \"trace\" event [transportId:{transport.TransportId}, trace:{traceData.Type.GetEnumStringValue()}]");
+                _logger.LogDebug($"transport \"trace\" event [transportId:{transport.TransportId}, trace:{traceData.Type.GetEnumMemberValue()}]");
 
                 if (traceData.Type == TransportTraceEventType.BWE && traceData.Direction == TraceEventDirection.Out)
                 {
