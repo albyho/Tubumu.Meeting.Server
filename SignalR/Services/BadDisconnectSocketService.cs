@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
-namespace Tubumu.Meeting
+namespace Tubumu.Meeting.Server
 {
     public class BadDisconnectSocketService
     {
