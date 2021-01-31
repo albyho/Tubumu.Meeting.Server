@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <PackageId>Tubumu.Meeting.Server</PackageId>
-    <Version>1.0.10</Version>
+    <Version>2.0.0</Version>
     <Authors>Alby</Authors>
     <Company>Tubumu</Company>
 
@@ -19,7 +19,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Consul" Version="1.6.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="5.0.0" />
@@ -33,7 +32,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Tubumu.Core\Tubumu.Core.csproj" />
     <ProjectReference Include="..\Tubumu.Libuv\Tubumu.Libuv.csproj" />
-    <ProjectReference Include="..\Tubumu.Mediasoup\Tubumu.Mediasoup.csproj" />
     <ProjectReference Include="..\Tubumu.Mediasoup.Common\Tubumu.Mediasoup.Common.csproj" />
+    <ProjectReference Include="..\Tubumu.Mediasoup\Tubumu.Mediasoup.csproj" />
+    <ProjectReference Include="..\Tubumu.Mediasoup\Tubumu.Mediasoup.AspNetCore.csproj" />
   </ItemGroup>
 </Project>
