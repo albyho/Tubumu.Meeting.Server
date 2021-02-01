@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 
 namespace Tubumu.Meeting.Server
 {
@@ -9,7 +9,7 @@ namespace Tubumu.Meeting.Server
     {
         public string Type { get; set; }
 
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public object? Data { get; set; }
 
         public static string Stringify(string type, string? data = null)

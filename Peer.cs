@@ -2,10 +2,11 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Threading;
-using Newtonsoft.Json;
 using Tubumu.Core.Extensions;
 using Tubumu.Mediasoup;
 using Tubumu.Mediasoup.Extensions;
@@ -858,7 +859,7 @@ namespace Tubumu.Meeting.Server
                         var status = await transport.GetStatsAsync();
                         // TODO: (alby)考虑不进行反序列化
                         // TODO: (alby)实际上有 WebTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。这里反序列化后会丢失数据。
-                        var data = JsonConvert.DeserializeObject<TransportStat>(status!);
+                        var data = JsonSerializer.Deserialize<TransportStat>(status!)!;
                         return data;
                     }
                 }
@@ -889,7 +890,7 @@ namespace Tubumu.Meeting.Server
 
                         var status = await producer.GetStatsAsync();
                         // TODO: (alby)考虑不进行反序列化
-                        var data = JsonConvert.DeserializeObject<ProducerStat>(status!);
+                        var data = JsonSerializer.Deserialize<ProducerStat>(status!)!;
                         return data;
                     }
                 }
@@ -920,7 +921,7 @@ namespace Tubumu.Meeting.Server
 
                         var status = await consumer.GetStatsAsync();
                         // TODO: (alby)考虑不进行反序列化
-                        var data = JsonConvert.DeserializeObject<ConsumerStat>(status!);
+                        var data = JsonSerializer.Deserialize<ConsumerStat>(status!)!;
                         return data;
                     }
                 }

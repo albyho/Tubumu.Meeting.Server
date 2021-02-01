@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text.Json.Serialization;
 
 namespace Tubumu.Meeting.Server
 {
@@ -9,7 +9,7 @@ namespace Tubumu.Meeting.Server
     {
         public int Code { get; set; } = 200;
 
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? InternalCode { get; set; }
 
         public string Message { get; set; } = "Success";
@@ -29,7 +29,7 @@ namespace Tubumu.Meeting.Server
     /// </summary>
     public class MeetingMessage<T> : MeetingMessage
     {
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public T Data { get; set; }
     }
 }
