@@ -294,9 +294,9 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumeRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> Pull(PullRequest consumeRequest)
+        public async Task<MeetingMessage> Pull(PullRequest pullRequest)
         {
-            var consumeResult = await _scheduler.PullAsync(UserId, ConnectionId, consumeRequest);
+            var consumeResult = await _scheduler.PullAsync(UserId, ConnectionId, pullRequest);
             var consumerPeer = consumeResult.ConsumePeer;
             var producerPeer = consumeResult.ProducePeer;
 
