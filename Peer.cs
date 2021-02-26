@@ -134,13 +134,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        public async Task<WebRtcTransport> CreateWebRtcTransportAsync(CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        public async Task<WebRtcTransport> CreateWebRtcTransportAsync(CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
         {
-            if (!(createWebRtcTransportRequest.Consuming ^ createWebRtcTransportRequest.Producing))
-            {
-                throw new Exception("CreateWebRtcTransportAsync() | Consumer or Producing");
-            }
-
             var webRtcTransportOptions = new WebRtcTransportOptions
             {
                 ListenIps = _webRtcTransportSettings.ListenIps,
@@ -150,8 +145,8 @@ namespace Tubumu.Meeting.Server
                 NumSctpStreams = createWebRtcTransportRequest.SctpCapabilities?.NumStreams,
                 AppData = new Dictionary<string, object>
                     {
-                        { "Consuming", createWebRtcTransportRequest.Consuming },
-                        { "Producing", createWebRtcTransportRequest.Producing },
+                        { "Consuming", !isSend },
+                        { "Producing", isSend },
                     },
             };
 
@@ -177,12 +172,12 @@ namespace Tubumu.Meeting.Server
 
                     using (await _transportsLock.WriteLockAsync())
                     {
-                        if (createWebRtcTransportRequest.Consuming && HasConsumingTransport())
+                        if (!isSend && HasConsumingTransport())
                         {
                             throw new Exception("CreateWebRtcTransportAsync() | Consuming transport exists");
                         }
 
-                        if (createWebRtcTransportRequest.Producing && HasProducingTransport())
+                        if (isSend && HasProducingTransport())
                         {
                             throw new Exception("CreateWebRtcTransportAsync() | Producing transport exists");
                         }
@@ -349,7 +344,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<PeerPullResult> PullInternalAsync(Peer producerPeer, IEnumerable<string> sources)
+        private async Task<PeerPullResult> PullInternalAsync(Peer producerPeer, IEnumerable<string> sources)
         {
             var consumerActiveRoom = _room!;
             var producerActiveRoom = producerPeer._room!;

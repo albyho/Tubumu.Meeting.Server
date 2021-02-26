@@ -51,7 +51,7 @@ namespace Tubumu.Meeting.Server
             if (leaveResult != null)
             {
                 // Message: peerLeave
-                SendNotification(leaveResult.OtherPeerIds, "peerLeave", new { PeerId = leaveResult.SelfPeer.PeerId });
+                SendNotification(leaveResult.OtherPeerIds, "peerLeaveRoom", new { PeerId = leaveResult.SelfPeer.PeerId });
                 _badDisconnectSocketService.DisconnectClient(leaveResult.SelfPeer.ConnectionId);
             }
         }
@@ -186,13 +186,33 @@ namespace Tubumu.Meeting.Server
         }
 
         /// <summary>
+        /// Create send WebRTC transport.
+        /// </summary>
+        /// <param name="createWebRtcTransportRequest"></param>
+        /// <returns></returns>
+        public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateSendWebRtcTransport(CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        {
+            return CreateWebRtcTransportAsync(createWebRtcTransportRequest, true);
+        }
+
+        /// <summary>
+        /// Create recv WebRTC transport.
+        /// </summary>
+        /// <param name="createWebRtcTransportRequest"></param>
+        /// <returns></returns>
+        public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateRecvWebRtcTransport(CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        {
+            return CreateWebRtcTransportAsync(createWebRtcTransportRequest, false);
+        }
+
+        /// <summary>
         /// Create WebRTC transport.
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<CreateWebRtcTransportResult>> CreateWebRtcTransport(CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        private async Task<MeetingMessage<CreateWebRtcTransportResult>> CreateWebRtcTransportAsync(CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
         {
-            var transport = await _scheduler.CreateWebRtcTransportAsync(UserId, ConnectionId, createWebRtcTransportRequest);
+            var transport = await _scheduler.CreateWebRtcTransportAsync(UserId, ConnectionId, createWebRtcTransportRequest, isSend);
             transport.On("sctpstatechange", sctpState =>
             {
                 _logger.LogDebug($"WebRtcTransport \"sctpstatechange\" event [sctpState:{sctpState}]");
@@ -235,7 +255,7 @@ namespace Tubumu.Meeting.Server
             return new MeetingMessage<CreateWebRtcTransportResult>
             {
                 Code = 200,
-                Message = $"CreateWebRtcTransport 成功({(createWebRtcTransportRequest.Producing ? "Producing" : "Consuming")})",
+                Message = $"CreateWebRtcTransport 成功({(isSend ? "Producing" : "Consuming")})",
                 Data = new CreateWebRtcTransportResult
                 {
                     TransportId = transport.TransportId,
