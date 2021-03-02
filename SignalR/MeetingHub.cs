@@ -50,7 +50,7 @@ namespace Tubumu.Meeting.Server
             var leaveResult = await _scheduler.LeaveAsync(UserId);
             if (leaveResult != null)
             {
-                // Message: peerLeave
+                // Notification: peerLeaveRoom
                 SendNotification(leaveResult.OtherPeerIds, "peerLeaveRoom", new { PeerId = leaveResult.SelfPeer.PeerId });
                 _badDisconnectSocketService.DisconnectClient(leaveResult.SelfPeer.ConnectionId);
             }
@@ -97,7 +97,7 @@ namespace Tubumu.Meeting.Server
 
             // 将自身的信息告知给房间内的其他人
             var otherPeerIds = joinRoomResult.Peers.Select(m => m.PeerId).Where(m => m != joinRoomResult.SelfPeer.PeerId).ToArray();
-            // Message: peerJoinRoom
+            // Notification: peerJoinRoom
             SendNotification(otherPeerIds, "peerJoinRoom", new
             {
                 Peer = joinRoomResult.SelfPeer
@@ -120,7 +120,7 @@ namespace Tubumu.Meeting.Server
         {
             var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
 
-            // Message: peerLeaveRoom
+            // Notification: peerLeaveRoom
             SendNotification(leaveRoomResult.OtherPeerIds, "peerLeaveRoom", new
             {
                 PeerId = UserId
@@ -138,7 +138,7 @@ namespace Tubumu.Meeting.Server
         {
             var peerPeerAppDataResult = await _scheduler.SetPeerAppDataAsync(UserId, ConnectionId, setPeerAppDataRequest);
 
-            // Message: peerPeerAppDataChanged
+            // Notification: peerPeerAppDataChanged
             SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerPeerAppDataChanged", new
             {
                 PeerId = UserId,
@@ -157,7 +157,7 @@ namespace Tubumu.Meeting.Server
         {
             var peerPeerAppDataResult = await _scheduler.UnsetPeerAppDataAsync(UserId, ConnectionId, unsetPeerAppDataRequest);
 
-            // Message: peerPeerAppDataChanged
+            // Notification: peerPeerAppDataChanged
             SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerPeerAppDataChanged", new
             {
                 PeerId = UserId,
@@ -175,7 +175,7 @@ namespace Tubumu.Meeting.Server
         {
             var peerPeerAppDataResult = await _scheduler.ClearPeerAppDataAsync(UserId, ConnectionId);
 
-            // Message: peerPeerAppDataChanged
+            // Notification: peerPeerAppDataChanged
             SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerPeerAppDataChanged", new
             {
                 PeerId = UserId,
@@ -241,7 +241,7 @@ namespace Tubumu.Meeting.Server
 
                 if (traceData.Type == TransportTraceEventType.BWE && traceData.Direction == TraceEventDirection.Out)
                 {
-                    // Message: downlinkBwe
+                    // Notification: downlinkBwe
                     SendNotification(peerId, "downlinkBwe", new
                     {
                         DesiredBitrate = traceData.Info["desiredBitrate"],
@@ -308,8 +308,8 @@ namespace Tubumu.Meeting.Server
 
             if (!consumeResult.ProduceSources.IsNullOrEmpty())
             {
-                // Message: produceSources
-                SendNotification(consumeResult.ProducePeer.PeerId, "produceSources", new
+                // Notification: produceSources
+                SendNotification(consumeResult.ConsumePeer.PeerId, "produceSources", new
                 {
                     ProduceSources = consumeResult.ProduceSources
                 });
@@ -356,7 +356,7 @@ namespace Tubumu.Meeting.Server
             producer.On("score", score =>
             {
                 var data = (ProducerScore[])score!;
-                // Message: producerScore
+                // Notification: producerScore
                 SendNotification(peerId, "producerScore", new { ProducerId = producer.ProducerId, Score = data });
                 return Task.CompletedTask;
             });
@@ -470,7 +470,7 @@ namespace Tubumu.Meeting.Server
                     return new MeetingMessage { Code = 400, Message = "ResumeConsumer 失败" };
                 }
 
-                // Message: consumerScore
+                // Notification: consumerScore
                 SendNotification(UserId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = consumer.Score });
             }
             catch (Exception ex)
@@ -583,7 +583,7 @@ namespace Tubumu.Meeting.Server
         {
             var otherPeerIds = await _scheduler.GetOtherPeerIdsAsync(UserId, ConnectionId);
 
-            // Message: newMessage
+            // Notification: newMessage
             SendNotification(otherPeerIds, "newMessage", new
             {
                 RoomId = sendMessageRequest.RoomId,
@@ -616,7 +616,7 @@ namespace Tubumu.Meeting.Server
             consumer.On("score", (score) =>
             {
                 var data = (ConsumerScore)score!;
-                // Message: consumerScore
+                // Notification: consumerScore
                 SendNotification(consumerPeer.PeerId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = data });
                 return Task.CompletedTask;
             });
@@ -627,21 +627,21 @@ namespace Tubumu.Meeting.Server
             // consumer.On("transportclose", _ => ...);
             consumer.Observer.On("close", _ =>
             {
-                // Message: consumerClosed
+                // Notification: consumerClosed
                 SendNotification(consumerPeer.PeerId, "consumerClosed", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
 
             consumer.On("producerpause", _ =>
             {
-                // Message: consumerPaused
+                // Notification: consumerPaused
                 SendNotification(consumerPeer.PeerId, "consumerPaused", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
 
             consumer.On("producerresume", _ =>
             {
-                // Message: consumerResumed
+                // Notification: consumerResumed
                 SendNotification(consumerPeer.PeerId, "consumerResumed", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
@@ -650,7 +650,7 @@ namespace Tubumu.Meeting.Server
             {
                 var data = (ConsumerLayers?)layers;
 
-                // Message: consumerLayersChanged
+                // Notification: consumerLayersChanged
                 SendNotification(consumerPeer.PeerId, "consumerLayersChanged", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
@@ -667,7 +667,7 @@ namespace Tubumu.Meeting.Server
             });
 
             // Send a request to the remote Peer with Consumer parameters.
-            // Message: newConsumer
+            // Notification: newConsumer
 
             SendNotification(consumerPeer.PeerId, "newConsumer", new ConsumeInfo
             {
