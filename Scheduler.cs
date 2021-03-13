@@ -209,7 +209,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<WebRtcTransport> CreateWebRtcTransportAsync(string peerId, string connectionId, CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        public async Task<WebRtcTransport> CreateWebRtcTransportAsync(string peerId, string connectionId, CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
         {
             using (await _peersLock.ReadLockAsync())
             {
@@ -220,7 +220,7 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                return await peer.CreateWebRtcTransportAsync(createWebRtcTransportRequest);
+                return await peer.CreateWebRtcTransportAsync(createWebRtcTransportRequest, isSend);
             }
         }
 
