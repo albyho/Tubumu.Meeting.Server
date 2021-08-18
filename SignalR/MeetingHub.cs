@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
+using SignalRSwaggerGen.Attributes;
 using Tubumu.Core.Extensions;
 using Tubumu.Mediasoup;
 using Tubumu.Mediasoup.Extensions;
@@ -12,22 +14,29 @@ using Tubumu.Mediasoup.Extensions;
 namespace Tubumu.Meeting.Server
 {
     [Authorize]
+    [SignalRHub(path: "/hubs/meetingHub")]
     public partial class MeetingHub : Hub<IPeer>
     {
         private readonly ILogger<MeetingHub> _logger;
         private readonly IHubContext<MeetingHub, IPeer> _hubContext;
         private readonly BadDisconnectSocketService _badDisconnectSocketService;
         private readonly Scheduler _scheduler;
+        private readonly MeetingServerOptions _meetingServerOptions;
 
         private string UserId => Context.UserIdentifier;
         private string ConnectionId => Context.ConnectionId;
 
-        public MeetingHub(ILogger<MeetingHub> logger, IHubContext<MeetingHub, IPeer> hubContext, BadDisconnectSocketService badDisconnectSocketService, Scheduler scheduler)
+        public MeetingHub(ILogger<MeetingHub> logger,
+            IHubContext<MeetingHub, IPeer> hubContext,
+            BadDisconnectSocketService badDisconnectSocketService,
+            Scheduler scheduler,
+            MeetingServerOptions meetingServerOptions)
         {
             _logger = logger;
             _hubContext = hubContext;
             _scheduler = scheduler;
             _badDisconnectSocketService = badDisconnectSocketService;
+            _meetingServerOptions = meetingServerOptions;
         }
 
         public override async Task OnConnectedAsync()
@@ -65,6 +74,7 @@ namespace Tubumu.Meeting.Server
         /// Get RTP capabilities of router.
         /// </summary>
         /// <returns></returns>
+        [SignalRMethod(name: "GetRouterRtpCapabilities", operationType: OperationType.Get)]
         public MeetingMessage<RtpCapabilities> GetRouterRtpCapabilities()
         {
             var rtpCapabilities = _scheduler.DefaultRtpCapabilities;
@@ -76,7 +86,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="joinRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> Join(JoinRequest joinRequest)
+        [SignalRMethod(name: "Join", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> Join([SignalRArg] JoinRequest joinRequest)
         {
             if (!await _scheduler.JoinAsync(UserId, ConnectionId, joinRequest))
             {
@@ -91,7 +102,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="joinRoomRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<JoinRoomResponse>> JoinRoom(JoinRoomRequest joinRoomRequest)
+        [SignalRMethod(name: "JoinRoom", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<JoinRoomResponse>> JoinRoom([SignalRArg] JoinRoomRequest joinRoomRequest)
         {
             var joinRoomResult = await _scheduler.JoinRoomAsync(UserId, ConnectionId, joinRoomRequest);
 
@@ -114,8 +126,8 @@ namespace Tubumu.Meeting.Server
         /// <summary>
         /// Leave room.
         /// </summary>
-        /// <param name="roomId"></param>
         /// <returns></returns>
+        [SignalRMethod(name: "LeaveRoom", operationType: OperationType.Get)]
         public async Task<MeetingMessage> LeaveRoom()
         {
             var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
@@ -134,12 +146,13 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="setPeerAppDataRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> SetPeerAppData(SetPeerAppDataRequest setPeerAppDataRequest)
+        [SignalRMethod(name: "SetPeerAppData", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> SetPeerAppData([SignalRArg] SetPeerAppDataRequest setPeerAppDataRequest)
         {
             var peerPeerAppDataResult = await _scheduler.SetPeerAppDataAsync(UserId, ConnectionId, setPeerAppDataRequest);
 
-            // Notification: peerPeerAppDataChanged
-            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerPeerAppDataChanged", new
+            // Notification: peerAppDataChanged
+            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
             {
                 PeerId = UserId,
                 AppData = peerPeerAppDataResult.AppData,
@@ -153,12 +166,13 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="unsetPeerAppDataRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> UnsetPeerAppData(UnsetPeerAppDataRequest unsetPeerAppDataRequest)
+        [SignalRMethod(name: "UnsetPeerAppData", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> UnsetPeerAppData([SignalRArg] UnsetPeerAppDataRequest unsetPeerAppDataRequest)
         {
             var peerPeerAppDataResult = await _scheduler.UnsetPeerAppDataAsync(UserId, ConnectionId, unsetPeerAppDataRequest);
 
-            // Notification: peerPeerAppDataChanged
-            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerPeerAppDataChanged", new
+            // Notification: peerAppDataChanged
+            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
             {
                 PeerId = UserId,
                 AppData = peerPeerAppDataResult.AppData,
@@ -171,12 +185,13 @@ namespace Tubumu.Meeting.Server
         /// Clear peer's appData. Then notify other peer, if in a room.
         /// </summary>
         /// <returns></returns>
+        [SignalRMethod(name: "ClearPeerAppData", operationType: OperationType.Get)]
         public async Task<MeetingMessage> ClearPeerAppData()
         {
             var peerPeerAppDataResult = await _scheduler.ClearPeerAppDataAsync(UserId, ConnectionId);
 
-            // Notification: peerPeerAppDataChanged
-            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerPeerAppDataChanged", new
+            // Notification: peerAppDataChanged
+            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
             {
                 PeerId = UserId,
                 AppData = peerPeerAppDataResult.AppData,
@@ -190,7 +205,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateSendWebRtcTransport(CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        [SignalRMethod(name: "CreateSendWebRtcTransport", operationType: OperationType.Post)]
+        public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateSendWebRtcTransport([SignalRArg] CreateWebRtcTransportRequest createWebRtcTransportRequest)
         {
             return CreateWebRtcTransportAsync(createWebRtcTransportRequest, true);
         }
@@ -200,7 +216,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateRecvWebRtcTransport(CreateWebRtcTransportRequest createWebRtcTransportRequest)
+        [SignalRMethod(name: "CreateRecvWebRtcTransport", operationType: OperationType.Post)]
+        public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateRecvWebRtcTransport([SignalRArg] CreateWebRtcTransportRequest createWebRtcTransportRequest)
         {
             return CreateWebRtcTransportAsync(createWebRtcTransportRequest, false);
         }
@@ -210,7 +227,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        private async Task<MeetingMessage<CreateWebRtcTransportResult>> CreateWebRtcTransportAsync(CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
+        private async Task<MeetingMessage<CreateWebRtcTransportResult>> CreateWebRtcTransportAsync([SignalRArg] CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
         {
             var transport = await _scheduler.CreateWebRtcTransportAsync(UserId, ConnectionId, createWebRtcTransportRequest, isSend);
             transport.On("sctpstatechange", sctpState =>
@@ -272,7 +289,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="connectWebRtcTransportRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> ConnectWebRtcTransport(ConnectWebRtcTransportRequest connectWebRtcTransportRequest)
+        [SignalRMethod(name: "ConnectWebRtcTransport", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> ConnectWebRtcTransport([SignalRArg] ConnectWebRtcTransportRequest connectWebRtcTransportRequest)
         {
             try
             {
@@ -292,10 +310,16 @@ namespace Tubumu.Meeting.Server
         /// <summary>
         /// Pull medias.
         /// </summary>
-        /// <param name="consumeRequest"></param>
+        /// <param name="pullRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> Pull(PullRequest pullRequest)
+        [SignalRMethod(name: "Pull", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> Pull([SignalRArg] PullRequest pullRequest)
         {
+            if (_meetingServerOptions.ServeMode != ServeMode.Pull)
+            {
+                throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Pull}\" mode.");
+            }
+
             var consumeResult = await _scheduler.PullAsync(UserId, ConnectionId, pullRequest);
             var consumerPeer = consumeResult.ConsumePeer;
             var producerPeer = consumeResult.ProducePeer;
@@ -303,7 +327,7 @@ namespace Tubumu.Meeting.Server
             foreach (var producer in consumeResult.ExistsProducers)
             {
                 // 本 Peer 消费其他 Peer
-                CreateConsumer(consumerPeer, producerPeer, producer).ContinueWithOnFaultedHandleLog(_logger);
+                CreateConsumer(consumerPeer.PeerId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
             }
 
             if (!consumeResult.ProduceSources.IsNullOrEmpty())
@@ -319,16 +343,109 @@ namespace Tubumu.Meeting.Server
         }
 
         /// <summary>
+        /// Invite medias.
+        /// </summary>
+        /// <param name="inviteRequest"></param>
+        /// <returns></returns>
+        [SignalRMethod(name: "Invite", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> Invite([SignalRArg] InviteRequest inviteRequest)
+        {
+            // TODO: (alby) 仅会议室管理员可以邀请。
+            if (inviteRequest.Sources.IsNullOrEmpty()||inviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
+            {
+                return new MeetingMessage<ProduceRespose>
+                {
+                    Code = 400,
+                    Message = $"Invite 失败: Sources 参数缺失或非法。",
+                };
+            }
+
+            // WARN: 暂未校验被邀请方是否有对应的 Source 。
+
+            var setPeerControlDataRequest = new SetPeerControlDataRequest
+            {
+                PeerId = inviteRequest.ProducerPeerId,
+                PeerControlData = new Dictionary<string, object>()
+            };
+            foreach (var source in inviteRequest.Sources)
+            {
+                setPeerControlDataRequest.PeerControlData[$"Invate:{source}"] = true;
+            };
+
+            await _scheduler.SetPeerControlDataAsync(setPeerControlDataRequest);
+
+            // Notification: produceSources
+            SendNotification(inviteRequest.ProducerPeerId, "produceSources", new
+            {
+                ProduceSources = inviteRequest.Sources
+            });
+
+            return new MeetingMessage { Code = 200, Message = "Invite 成功" };
+        }
+
+        /// <summary>
+        /// Deinvite medias.
+        /// </summary>
+        /// <param name="inviteRequest"></param>
+        /// <returns></returns>
+        [SignalRMethod(name: "Deinvite", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> Deinvite([SignalRArg] DeinviteRequest deinviteRequest)
+        {
+            // TODO: (alby) 仅会议室管理员可以取消邀请。
+            if (deinviteRequest.Sources.IsNullOrEmpty() || deinviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
+            {
+                return new MeetingMessage<ProduceRespose>
+                {
+                    Code = 400,
+                    Message = $"Deinvite 失败: Sources 参数缺失或非法。",
+                };
+            }
+
+            // WARN: 暂未校验被邀请方是否有对应的 Source 。也未校验
+
+            var setPeerControlDataRequest = new UnsetPeerControlDataRequest
+            {
+                PeerId = deinviteRequest.ProducerPeerId,
+            };
+            var keys = new List<string>();
+            foreach (var source in deinviteRequest.Sources)
+            {
+                keys.Add($"Invate:{source}");
+            };
+            setPeerControlDataRequest.Keys = keys.ToArray();
+
+            await _scheduler.UnsetPeerControlDataAsync(setPeerControlDataRequest);
+
+            await _scheduler.CloseProducerWithSourcesAsync(deinviteRequest.ProducerPeerId, deinviteRequest.Sources);
+
+            // Notification: closeSources
+            SendNotification(deinviteRequest.ProducerPeerId, "closeSources", new
+            {
+                CloseSources = deinviteRequest.Sources
+            });
+
+            return new MeetingMessage { Code = 200, Message = "Deinvite 成功" };
+        }
+
+        /// <summary>
         /// Produce media.
         /// </summary>
         /// <param name="produceRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<ProduceRespose>> Produce(ProduceRequest produceRequest)
+        [SignalRMethod(name: "Produce", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<ProduceRespose>> Produce([SignalRArg] ProduceRequest produceRequest)
         {
+            // HACK: Android 传入 RtpParameters 有误的临时处理方案
+            if (produceRequest.Kind == MediaKind.Audio)
+            {
+                produceRequest.RtpParameters.Codecs[0].Channels = 2;
+                produceRequest.RtpParameters.Codecs[0].PayloadType = 111;
+            }
             var peerId = UserId;
             ProduceResult produceResult;
             try
             {
+                // WARN: 在 Invate 模式下暂未校验是否被邀请 。
                 produceResult = await _scheduler.ProduceAsync(peerId, ConnectionId, produceRequest);
             }
             catch (Exception ex)
@@ -342,11 +459,13 @@ namespace Tubumu.Meeting.Server
 
             var producerPeer = produceResult.ProducerPeer;
             var producer = produceResult.Producer;
+            var otherPeers = _meetingServerOptions.ServeMode == ServeMode.Pull ?
+                produceResult.PullPaddingConsumerPeers : await producerPeer.GetOtherPeersAsync();
 
-            foreach (var consumerPeer in produceResult.PullPaddingConsumerPeers)
+            foreach (var consumerPeer in otherPeers)
             {
                 // 其他 Peer 消费本 Peer
-                CreateConsumer(consumerPeer, producerPeer, producer).ContinueWithOnFaultedHandleLog(_logger);
+                CreateConsumer(consumerPeer.PeerId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
             }
 
             // NOTE: For Testing
@@ -362,12 +481,14 @@ namespace Tubumu.Meeting.Server
             });
             producer.On("videoorientationchange", videoOrientation =>
             {
+                // Notification: videoorientationchange
                 var data = (ProducerVideoOrientation)videoOrientation!;
                 _logger.LogDebug($"producer.On() | Producer \"videoorientationchange\" Event [producerId:\"{producer.ProducerId}\", VideoOrientation:\"{videoOrientation}\"]");
                 return Task.CompletedTask;
             });
             producer.Observer.On("close", _ =>
             {
+                // Notification: producerClosed
                 SendNotification(peerId, "producerClosed", new { ProducerId = producer.ProducerId });
                 return Task.CompletedTask;
             });
@@ -385,7 +506,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> CloseProducer(string producerId)
+        [SignalRMethod(name: "CloseProducer", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> CloseProducer([SignalRArg] string producerId)
         {
             if (!await _scheduler.CloseProducerAsync(UserId, ConnectionId, producerId))
             {
@@ -400,7 +522,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> PauseProducer(string producerId)
+        [SignalRMethod(name: "PauseProducer", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> PauseProducer([SignalRArg] string producerId)
         {
             if (!await _scheduler.PauseProducerAsync(UserId, ConnectionId, producerId))
             {
@@ -415,7 +538,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> ResumeProducer(string producerId)
+        [SignalRMethod(name: "ResumeProducer", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> ResumeProducer([SignalRArg] string producerId)
         {
             if (!await _scheduler.ResumeProducerAsync(UserId, ConnectionId, producerId))
             {
@@ -430,7 +554,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> CloseConsumer(string consumerId)
+        [SignalRMethod(name: "CloseConsumer", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> CloseConsumer([SignalRArg] string consumerId)
         {
             if (!await _scheduler.CloseConsumerAsync(UserId, ConnectionId, consumerId))
             {
@@ -445,7 +570,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> PauseConsumer(string consumerId)
+        [SignalRMethod(name: "PauseConsumer", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> PauseConsumer([SignalRArg] string consumerId)
         {
             if (!await _scheduler.PauseConsumerAsync(UserId, ConnectionId, consumerId))
             {
@@ -460,7 +586,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> ResumeConsumer(string consumerId)
+        [SignalRMethod(name: "ResumeConsumer", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> ResumeConsumer([SignalRArg] string consumerId)
         {
             try
             {
@@ -490,7 +617,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="setConsumerPreferedLayersRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> SetConsumerPreferedLayers(SetConsumerPreferedLayersRequest setConsumerPreferedLayersRequest)
+        [SignalRMethod(name: "SetConsumerPreferedLayers", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> SetConsumerPreferedLayers([SignalRArg] SetConsumerPreferedLayersRequest setConsumerPreferedLayersRequest)
         {
             if (!await _scheduler.SetConsumerPreferedLayersAsync(UserId, ConnectionId, setConsumerPreferedLayersRequest))
             {
@@ -505,7 +633,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="setConsumerPriorityRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> SetConsumerPriority(SetConsumerPriorityRequest setConsumerPriorityRequest)
+        [SignalRMethod(name: "SetConsumerPriority", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> SetConsumerPriority([SignalRArg] SetConsumerPriorityRequest setConsumerPriorityRequest)
         {
             if (!await _scheduler.SetConsumerPriorityAsync(UserId, ConnectionId, setConsumerPriorityRequest))
             {
@@ -520,7 +649,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> RequestConsumerKeyFrame(string consumerId)
+        [SignalRMethod(name: "RequestConsumerKeyFrame", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> RequestConsumerKeyFrame([SignalRArg] string consumerId)
         {
             if (!await _scheduler.RequestConsumerKeyFrameAsync(UserId, ConnectionId, consumerId))
             {
@@ -535,7 +665,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<TransportStat>> GetTransportStats(string transportId)
+        [SignalRMethod(name: "GetTransportStats", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<TransportStat>> GetTransportStats([SignalRArg] string transportId)
         {
             var data = await _scheduler.GetTransportStatsAsync(UserId, ConnectionId, transportId);
             return new MeetingMessage<TransportStat> { Code = 200, Message = "GetTransportStats 成功", Data = data };
@@ -546,7 +677,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<ProducerStat>> GetProducerStats(string producerId)
+        [SignalRMethod(name: "GetProducerStats", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<ProducerStat>> GetProducerStats([SignalRArg] string producerId)
         {
             var data = await _scheduler.GetProducerStatsAsync(UserId, ConnectionId, producerId);
             return new MeetingMessage<ProducerStat> { Code = 200, Message = "GetProducerStats 成功", Data = data };
@@ -557,7 +689,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<ConsumerStat>> GetConsumerStats(string consumerId)
+        [SignalRMethod(name: "GetConsumerStats", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<ConsumerStat>> GetConsumerStats([SignalRArg] string consumerId)
         {
             var data = await _scheduler.GetConsumerStatsAsync(UserId, ConnectionId, consumerId);
             return new MeetingMessage<ConsumerStat> { Code = 200, Message = "GetConsumerStats 成功", Data = data };
@@ -568,7 +701,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage<IceParameters?>> RestartIce(string transportId)
+        [SignalRMethod(name: "RestartIce", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<IceParameters?>> RestartIce([SignalRArg] string transportId)
         {
             var iceParameters = await _scheduler.RestartIceAsync(UserId, ConnectionId, transportId);
             return new MeetingMessage<IceParameters?> { Code = 200, Message = "RestartIce 成功", Data = iceParameters };
@@ -579,7 +713,8 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="sendMessageRequest"></param>
         /// <returns></returns>
-        public async Task<MeetingMessage> SendMessage(SendMessageRequest sendMessageRequest)
+        [SignalRMethod(name: "SendMessage", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> SendMessage([SignalRArg] SendMessageRequest sendMessageRequest)
         {
             var otherPeerIds = await _scheduler.GetOtherPeerIdsAsync(UserId, ConnectionId);
 
@@ -595,16 +730,16 @@ namespace Tubumu.Meeting.Server
 
         #region Private Methods
 
-        private async Task CreateConsumer(Peer consumerPeer, Peer producerPeer, Producer producer)
+        private async Task CreateConsumer(string consumerPeerId, string producerPeerId, Producer producer)
         {
-            _logger.LogDebug($"CreateConsumer() | [ConsumerPeer:\"{consumerPeer.PeerId}\", ProducerPeer:\"{producerPeer.PeerId}\", Producer:\"{producer.ProducerId}\"]");
+            _logger.LogDebug($"CreateConsumer() | [ConsumerPeer:\"{consumerPeerId}\", ProducerPeer:\"{producerPeerId}\", Producer:\"{producer.ProducerId}\"]");
 
             // Create the Consumer in paused mode.
             Consumer consumer;
 
             try
             {
-                consumer = await _scheduler.ConsumeAsync(producerPeer.PeerId, consumerPeer.PeerId, producer.ProducerId);
+                consumer = await _scheduler.ConsumeAsync(producerPeerId, consumerPeerId, producer.ProducerId);
             }
             catch (Exception ex)
             {
@@ -617,7 +752,7 @@ namespace Tubumu.Meeting.Server
             {
                 var data = (ConsumerScore)score!;
                 // Notification: consumerScore
-                SendNotification(consumerPeer.PeerId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = data });
+                SendNotification(consumerPeerId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = data });
                 return Task.CompletedTask;
             });
 
@@ -628,21 +763,21 @@ namespace Tubumu.Meeting.Server
             consumer.Observer.On("close", _ =>
             {
                 // Notification: consumerClosed
-                SendNotification(consumerPeer.PeerId, "consumerClosed", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerClosed", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
 
             consumer.On("producerpause", _ =>
             {
                 // Notification: consumerPaused
-                SendNotification(consumerPeer.PeerId, "consumerPaused", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerPaused", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
 
             consumer.On("producerresume", _ =>
             {
                 // Notification: consumerResumed
-                SendNotification(consumerPeer.PeerId, "consumerResumed", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerResumed", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
 
@@ -651,7 +786,7 @@ namespace Tubumu.Meeting.Server
                 var data = (ConsumerLayers?)layers;
 
                 // Notification: consumerLayersChanged
-                SendNotification(consumerPeer.PeerId, "consumerLayersChanged", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerLayersChanged", new { ConsumerId = consumer.ConsumerId });
                 return Task.CompletedTask;
             });
 
@@ -662,16 +797,16 @@ namespace Tubumu.Meeting.Server
 
             consumer.On("trace", trace =>
             {
-                _logger.LogDebug($"consumer \"trace\" event [producerId:{consumer.ConsumerId}, trace:{trace}]");
+                _logger.LogDebug($"consumer \"trace\" event [consumerId:{consumer.ConsumerId}, trace:{trace}]");
                 return Task.CompletedTask;
             });
 
             // Send a request to the remote Peer with Consumer parameters.
             // Notification: newConsumer
 
-            SendNotification(consumerPeer.PeerId, "newConsumer", new ConsumeInfo
+            SendNotification(consumerPeerId, "newConsumer", new ConsumeInfo
             {
-                ProducerPeerId = producerPeer.PeerId,
+                ProducerPeerId = producerPeerId,
                 Kind = consumer.Kind,
                 ProducerId = producer.ProducerId,
                 ConsumerId = consumer.ConsumerId,

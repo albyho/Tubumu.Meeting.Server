@@ -38,7 +38,9 @@ namespace Tubumu.Meeting.Server
 
         public RtpCapabilities DefaultRtpCapabilities { get; private set; }
 
-        public Scheduler(ILoggerFactory loggerFactory, MediasoupOptions mediasoupOptions, MediasoupServer mediasoupServer)
+        public Scheduler(ILoggerFactory loggerFactory,
+            MediasoupOptions mediasoupOptions,
+            MediasoupServer mediasoupServer)
         {
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory.CreateLogger<Scheduler>();
@@ -209,6 +211,45 @@ namespace Tubumu.Meeting.Server
             }
         }
 
+        public async Task<PeerControlDataResult> SetPeerControlDataAsync(SetPeerControlDataRequest setPeerControlDataRequest)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(setPeerControlDataRequest.PeerId, out var peer))
+                {
+                    throw new Exception($"SetPeerControlDataAsync() | Peer:{setPeerControlDataRequest.PeerId} is not exists.");
+                }
+
+                return await peer.SetPeerControlDataAsync(setPeerControlDataRequest);
+            }
+        }
+
+        public async Task<PeerControlDataResult> UnsetPeerControlDataAsync(UnsetPeerControlDataRequest unsetPeerControlDataRequest)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(unsetPeerControlDataRequest.PeerId, out var peer))
+                {
+                    throw new Exception($"UnsetPeerControlDataAsync() | Peer:{unsetPeerControlDataRequest.PeerId} is not exists.");
+                }
+
+                return await peer.UnsetPeerControlDataAsync(unsetPeerControlDataRequest);
+            }
+        }
+
+        public async Task<PeerControlDataResult> ClearPeerControlDataAsync(string targetPeerId)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(targetPeerId, out var peer))
+                {
+                    throw new Exception($"ClearPeerControlDataAsync() | Peer:{targetPeerId} is not exists.");
+                }
+
+                return await peer.ClearPeerControlDataAsync();
+            }
+        }
+
         public async Task<WebRtcTransport> CreateWebRtcTransportAsync(string peerId, string connectionId, CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
         {
             using (await _peersLock.ReadLockAsync())
@@ -357,6 +398,34 @@ namespace Tubumu.Meeting.Server
                 CheckConnection(peer, connectionId);
 
                 return await peer.CloseProducerAsync(producerId);
+            }
+        }
+
+        public async Task<bool> CloseAllProducersAsync(string peerId, string connectionId)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(peerId, out var peer))
+                {
+                    throw new Exception($"CloseProducerAsync() | Peer:{peerId} is not exists.");
+                }
+
+                CheckConnection(peer, connectionId);
+
+                return await peer.CloseAllProducersAsync();
+            }
+        }
+
+        public async Task<bool> CloseProducerWithSourcesAsync(string peerId, IEnumerable<string> sources)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(peerId, out var peer))
+                {
+                    throw new Exception($"CloseProducerAsync() | Peer:{peerId} is not exists.");
+                }
+
+                return await peer.CloseProducerWithSourcesAsync(sources);
             }
         }
 

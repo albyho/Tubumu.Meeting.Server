@@ -145,6 +145,22 @@ namespace Tubumu.Meeting.Server
             }
         }
 
+        public async Task<Peer[]> GetPeersAsync()
+        {
+            using (await _closeLock.ReadLockAsync())
+            {
+                if (_closed)
+                {
+                    throw new Exception($"GetPeersAsync() | Room:{RoomId} was closed.");
+                }
+
+                using (await _peersLock.ReadLockAsync())
+                {
+                    return _peers.Values.ToArray();
+                }
+            }
+        }
+
         public async Task CloseAsync()
         {
             if (_closed)

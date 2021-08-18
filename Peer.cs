@@ -26,6 +26,9 @@ namespace Tubumu.Meeting.Server
 
         public ConcurrentDictionary<string, object> AppData { get; set; }
 
+        [JsonIgnore]
+        public ConcurrentDictionary<string, object> ControlData { get; set; }
+
         public bool Equals(Peer other)
         {
             if (other == null)
@@ -597,6 +600,63 @@ namespace Tubumu.Meeting.Server
             }
         }
 
+
+        /// <summary>
+        /// 停止生产全部
+        /// </summary>
+        /// <returns></returns>
+        public async Task<bool> CloseAllProducersAsync()
+        {
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                using (await _roomLock.ReadLockAsync())
+                {
+                    CheckRoom();
+
+                    using (await _producersLock.ReadLockAsync())
+                    {
+                        var producers = _producers.Values.ToArray();
+                        foreach (var producer in producers)
+                        {
+                            producer.Close();
+                        }
+
+                        return true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 停止生产指定 Source
+        /// </summary>
+        /// <returns></returns>
+        public async Task<bool> CloseProducerWithSourcesAsync(IEnumerable<string> sources)
+        {
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                using (await _roomLock.ReadLockAsync())
+                {
+                    CheckRoom();
+
+                    using (await _producersLock.ReadLockAsync())
+                    {
+                        var producers = _producers.Values.Where(m => sources.Contains(m.Source)).ToArray();
+                        foreach (var producer in producers)
+                        {
+                            producer.Close();
+                        }
+
+                        return true;
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// 暂停生产
         /// </summary>
@@ -1062,8 +1122,6 @@ namespace Tubumu.Meeting.Server
         /// <summary>
         /// 设置 AppData
         /// </summary>
-        /// <param name="peerId"></param>
-        /// <param name="connectionId"></param>
         /// <param name="setPeerAppDataRequest"></param>
         /// <returns></returns>
         public async Task<PeerAppDataResult> SetPeerAppDataAsync(SetPeerAppDataRequest setPeerAppDataRequest)
@@ -1087,7 +1145,7 @@ namespace Tubumu.Meeting.Server
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    var allPeerIds = await GetOtherPeerIdsInteralAsync();
+                    var allPeerIds = await GetPeerIdsInteralAsync();
                     peerAppDataResult.OtherPeerIds = allPeerIds.Where(m => m != PeerId).ToArray();
                     return peerAppDataResult;
                 }
@@ -1120,7 +1178,7 @@ namespace Tubumu.Meeting.Server
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    var allPeerIds = await GetOtherPeerIdsInteralAsync();
+                    var allPeerIds = await GetPeerIdsInteralAsync();
                     peerAppDataResult.OtherPeerIds = allPeerIds.Where(m => m != PeerId).ToArray();
                     return peerAppDataResult;
                 }
@@ -1130,7 +1188,6 @@ namespace Tubumu.Meeting.Server
         /// <summary>
         /// 清空 AppData
         /// </summary>
-        /// <param name="unsetPeerAppDataRequest"></param>
         /// <returns></returns>
         public async Task<PeerAppDataResult> ClearPeerAppDataAsync()
         {
@@ -1149,9 +1206,97 @@ namespace Tubumu.Meeting.Server
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    var allPeerIds = await GetOtherPeerIdsInteralAsync();
+                    var allPeerIds = await GetPeerIdsInteralAsync();
                     peerAppDataResult.OtherPeerIds = allPeerIds.Where(m => m != PeerId).ToArray();
                     return peerAppDataResult;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 设置 ControlData
+        /// </summary>
+        /// <param name="setPeerControlDataRequest"></param>
+        /// <returns></returns>
+        public async Task<PeerControlDataResult> SetPeerControlDataAsync(SetPeerControlDataRequest setPeerControlDataRequest)
+        {
+            var peerControlDataResult = new PeerControlDataResult
+            {
+                PeerIds = Array.Empty<string>(),
+            };
+
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                foreach (var item in setPeerControlDataRequest.PeerControlData)
+                {
+                    ControlData.AddOrUpdate(item.Key, item.Value, (oldKey, oldValue) => item.Value);
+                }
+
+                peerControlDataResult.ControlData = ControlData.ToDictionary(x => x.Key, x => x.Value);
+
+                using (await _roomLock.ReadLockAsync())
+                {
+                    peerControlDataResult.PeerIds = await GetPeerIdsInteralAsync();
+                    return peerControlDataResult;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 移除 ControlData
+        /// </summary>
+        /// <param name="unsetPeerControlDataRequest"></param>
+        /// <returns></returns>
+        public async Task<PeerControlDataResult> UnsetPeerControlDataAsync(UnsetPeerControlDataRequest unsetPeerControlDataRequest)
+        {
+            var peerControlDataResult = new PeerControlDataResult
+            {
+                PeerIds = Array.Empty<string>(),
+            };
+
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                foreach (var item in unsetPeerControlDataRequest.Keys)
+                {
+                    AppData.TryRemove(item, out var _);
+                }
+
+                peerControlDataResult.ControlData = ControlData.ToDictionary(x => x.Key, x => x.Value);
+
+                using (await _roomLock.ReadLockAsync())
+                {
+                    peerControlDataResult.PeerIds = await GetPeerIdsInteralAsync();
+                    return peerControlDataResult;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 清空 ControlData
+        /// </summary>
+        /// <returns></returns>
+        public async Task<PeerControlDataResult> ClearPeerControlDataAsync()
+        {
+            var peerControlDataResult = new PeerControlDataResult
+            {
+                PeerIds = Array.Empty<string>(),
+                ControlData = new Dictionary<string, object>()
+            };
+
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                ControlData.Clear();
+
+                using (await _roomLock.ReadLockAsync())
+                {
+                    peerControlDataResult.PeerIds = await GetPeerIdsInteralAsync();
+                    return peerControlDataResult;
                 }
             }
         }
@@ -1169,7 +1314,27 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    return await _room!.GetPeerIdsAsync();
+                    var allPeerIds = await GetPeerIdsInteralAsync();
+                    return allPeerIds.Where(m => m != PeerId).ToArray();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取 Room 内其他 Peer
+        /// </summary>
+        public async Task<Peer[]> GetOtherPeersAsync()
+        {
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                using (await _roomLock.ReadLockAsync())
+                {
+                    CheckRoom();
+
+                    var allPeers = await GetPeersInteralAsync();
+                    return allPeers.Where(m => m.PeerId != PeerId).ToArray();
                 }
             }
         }
@@ -1212,9 +1377,14 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<string[]> GetOtherPeerIdsInteralAsync()
+        private async Task<string[]> GetPeerIdsInteralAsync()
         {
             return _room != null ? await _room!.GetPeerIdsAsync() : Array.Empty<string>();
+        }
+
+        private async Task<Peer[]> GetPeersInteralAsync()
+        {
+            return _room != null ? await _room!.GetPeersAsync() : Array.Empty<Peer>();
         }
 
         #endregion Private Methods
