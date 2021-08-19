@@ -130,15 +130,23 @@ namespace Tubumu.Meeting.Server
         [SignalRMethod(name: "LeaveRoom", operationType: OperationType.Get)]
         public async Task<MeetingMessage> LeaveRoom()
         {
-            var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
-
-            // Notification: peerLeaveRoom
-            SendNotification(leaveRoomResult.OtherPeerIds, "peerLeaveRoom", new
+            try
             {
-                PeerId = UserId
-            });
+                var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
 
-            return new MeetingMessage { Code = 200, Message = "LeaveRoom 成功" };
+                // Notification: peerLeaveRoom
+                SendNotification(leaveRoomResult.OtherPeerIds, "peerLeaveRoom", new
+                {
+                    PeerId = UserId
+                });
+
+                return new MeetingMessage { Code = 200, Message = "LeaveRoom 成功" };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "LeaveRoom 调用失败.");
+                return new MeetingMessage { Code = 400, Message = "LeaveRoom 失败" };
+            }
         }
 
         /// <summary>
