@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Force.DeepCloner;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Threading;
 using Tubumu.Core.Extensions;
@@ -909,7 +910,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        public async Task<TransportStat> GetTransportStatsAsync(string transportId)
+        public async Task<TransportStat> GetWebRtcTransportStatsAsync(string transportId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -923,13 +924,13 @@ namespace Tubumu.Meeting.Server
                     {
                         if (_transports.TryGetValue(transportId, out var transport))
                         {
-                            throw new Exception($"GetTransportStatsAsync() | Peer:{PeerId} has no Transport:{transportId}.");
+                            throw new Exception($"GetWebRtcTransportStatsAsync() | Peer:{PeerId} has no Transport:{transportId}.");
                         }
 
                         var status = await transport.GetStatsAsync();
                         // TODO: (alby)考虑不进行反序列化
-                        // TODO: (alby)实际上有 WebTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。这里反序列化后会丢失数据。
-                        var data = JsonSerializer.Deserialize<TransportStat>(status!)!;
+                        // TransportStat 系列包括：WebTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。
+                        var data = JsonSerializer.Deserialize<WebRtcTransportStat>(status!)!;
                         return data;
                     }
                 }
@@ -1245,6 +1246,24 @@ namespace Tubumu.Meeting.Server
                 {
                     InternalData.AddOrUpdate(item.Key, item.Value, (oldKey, oldValue) => item.Value);
                 }
+
+                peerInternalDataResult.InternalData = InternalData.ToDictionary(x => x.Key, x => x.Value);
+                return peerInternalDataResult;
+            }
+        }
+
+        /// <summary>
+        /// 设置 InternalData
+        /// </summary>
+        /// <param name="setPeerInternalDataRequest"></param>
+        /// <returns></returns>
+        public async Task<PeerInternalDataResult> GetPeerInternalDataAsync(string peerId)
+        {
+            var peerInternalDataResult = new PeerInternalDataResult();
+
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
 
                 peerInternalDataResult.InternalData = InternalData.ToDictionary(x => x.Key, x => x.Value);
                 return peerInternalDataResult;

@@ -513,7 +513,26 @@ namespace Tubumu.Meeting.Server
             ProduceResult produceResult;
             try
             {
-                // TODO: (alby) [会议模式相关]在 Invate 模式下需验证生产的 Source 是否被邀请。如果不是管理员需校验是否被邀请。
+                // 在 Invate 模式下如果不是管理员需校验 Source 是否被邀请。
+                if (_meetingServerOptions.ServeMode == ServeMode.Invite && await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
+                {
+                    var internalData = await _scheduler.GetPeerInternalDataAsync(UserId, ConnectionId);
+                    var inviteKey = $"Invate:{produceRequest.Source}";
+                    if(!internalData.InternalData.TryGetValue(inviteKey, out var inviteValue)) {
+                        return new MeetingMessage<ProduceRespose>
+                        {
+                            Code = 400,
+                            Message = $"Produce 失败:未受邀请的生产。",
+                        };
+                    }
+
+                    // 清除邀请状态
+                    await _scheduler.UnsetPeerInternalDataAsync(new UnsetPeerInternalDataRequest
+                    {
+                        PeerId = UserId,
+                        Keys = new[] { inviteKey }
+                    });
+                }
                 produceResult = await _scheduler.ProduceAsync(peerId, ConnectionId, produceRequest);
             }
             catch (Exception ex)
@@ -741,11 +760,11 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "GetTransportStats", operationType: OperationType.Post)]
-        public async Task<MeetingMessage<TransportStat>> GetTransportStats([SignalRArg] string transportId)
+        [SignalRMethod(name: "GetWebRtcTransportStats", operationType: OperationType.Post)]
+        public async Task<MeetingMessage<TransportStat>> GetWebRtcTransportStats([SignalRArg] string transportId)
         {
-            var data = await _scheduler.GetTransportStatsAsync(UserId, ConnectionId, transportId);
-            return new MeetingMessage<TransportStat> { Code = 200, Message = "GetTransportStats 成功", Data = data };
+            var data = await _scheduler.GetWebRtcTransportStatsAsync(UserId, ConnectionId, transportId);
+            return new MeetingMessage<TransportStat> { Code = 200, Message = "GetWebRtcTransportStats 成功", Data = data };
         }
 
         /// <summary>

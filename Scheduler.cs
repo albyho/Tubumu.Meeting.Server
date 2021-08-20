@@ -234,6 +234,21 @@ namespace Tubumu.Meeting.Server
             }
         }
 
+        public async Task<PeerInternalDataResult> GetPeerInternalDataAsync(string peerId, string connectionId)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(peerId, out var peer))
+                {
+                    throw new Exception($"GetPeerInternalDataAsync() | Peer:{peerId} is not exists.");
+                }
+
+                CheckConnection(peer, connectionId);
+
+                return await peer.GetPeerInternalDataAsync(peerId);
+            }
+        }
+
         public async Task<PeerInternalDataResult> UnsetPeerInternalDataAsync(UnsetPeerInternalDataRequest unsetPeerInternalDataRequest)
         {
             using (await _peersLock.ReadLockAsync())
@@ -559,18 +574,18 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<TransportStat> GetTransportStatsAsync(string peerId, string connectionId, string transportId)
+        public async Task<TransportStat> GetWebRtcTransportStatsAsync(string peerId, string connectionId, string transportId)
         {
             using (await _peersLock.ReadLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetTransportStatsAsync() | Peer:{peerId} is not exists.");
+                    throw new Exception($"GetWebRtcTransportStatsAsync() | Peer:{peerId} is not exists.");
                 }
 
                 CheckConnection(peer, connectionId);
 
-                return await peer.GetTransportStatsAsync(transportId);
+                return await peer.GetWebRtcTransportStatsAsync(transportId);
             }
         }
 
