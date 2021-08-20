@@ -102,20 +102,22 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<JoinRoomResult> JoinRoomAsync(string peerId, string connectionId, JoinRoomRequest joinRoomRequest)
+        public async Task<JoinRoomResult?> JoinRoomAsync(string peerId, string connectionId, JoinRoomRequest joinRoomRequest)
         {
             using (await _peersLock.ReadLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"JoinRoomAsync() | Peer:{peerId} is not exists.");
+                    _logger.LogError($"JoinRoomAsync() | Peer:{peerId} is not exists.");
+                    return null;
                 }
 
                 CheckConnection(peer, connectionId);
 
                 if (peer.Sources.Except(peer.Sources).Any())
                 {
-                    throw new Exception($"JoinRoomAsync() | Peer:{peerId} don't has some sources which is in Room:{joinRoomRequest.RoomId}.");
+                    _logger.LogError($"JoinRoomAsync() | Peer:{peerId} don't has some sources which is in Room:{joinRoomRequest.RoomId}.");
+                    return null;
                 }
 
                 await _roomsLock.WaitAsync();
@@ -129,7 +131,7 @@ namespace Tubumu.Meeting.Server
 
                         // Create a mediasoup Router.
                         var worker = _mediasoupServer.GetWorker();
-                        var router = await worker.CreateRouterAsync(new RouterOptions
+                        var router = await worker!.CreateRouterAsync(new RouterOptions
                         {
                             MediaCodecs = mediaCodecs
                         });
@@ -153,6 +155,11 @@ namespace Tubumu.Meeting.Server
                     });
 
                     return result;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "JoinRoomAsync()");
+                    return null;
                 }
                 finally
                 {

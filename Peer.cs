@@ -1403,7 +1403,7 @@ namespace Tubumu.Meeting.Server
         {
             if (_room == null)
             {
-                throw new Exception($"CheckActiveRoom() | Peer:{PeerId} is not in any room.");
+                throw new Exception($"CheckRoom() | Peer:{PeerId} is not in any room.");
             }
         }
 

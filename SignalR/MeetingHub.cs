@@ -108,6 +108,10 @@ namespace Tubumu.Meeting.Server
         public async Task<MeetingMessage<JoinRoomResponse>> JoinRoom([SignalRArg] JoinRoomRequest joinRoomRequest)
         {
             var joinRoomResult = await _scheduler.JoinRoomAsync(UserId, ConnectionId, joinRoomRequest);
+            if(joinRoomResult == null)
+            {
+                return new MeetingMessage<JoinRoomResponse> { Code = 400, Message = "JoinRoom 失败" };
+            }
 
             // 将自身的信息告知给房间内的其他人
             var otherPeerIds = joinRoomResult.Peers.Select(m => m.PeerId).Where(m => m != joinRoomResult.SelfPeer.PeerId).ToArray();
@@ -256,6 +260,7 @@ namespace Tubumu.Meeting.Server
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "ConnectWebRtcTransport()");
                 return new MeetingMessage { Code = 400, Message = $"ConnectWebRtcTransport 失败: TransportId: {connectWebRtcTransportRequest.TransportId}, {ex.Message}" };
             }
 
@@ -280,8 +285,9 @@ namespace Tubumu.Meeting.Server
                         }
                     }
                 }
-                catch
+                catch(Exception ex)
                 {
+                    _logger.LogError(ex, "Ready()");
                     // Ignore
                 }
             }
@@ -537,6 +543,7 @@ namespace Tubumu.Meeting.Server
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Produce()");
                 return new MeetingMessage<ProduceRespose>
                 {
                     Code = 400,
@@ -693,6 +700,7 @@ namespace Tubumu.Meeting.Server
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "ResumeConsumer()");
                 return new MeetingMessage
                 {
                     Code = 400,
@@ -907,7 +915,7 @@ namespace Tubumu.Meeting.Server
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "CreateConsumer()");
+                _logger.LogError(ex, "CreateConsumer()");
                 return;
             }
 
