@@ -474,18 +474,17 @@ namespace Tubumu.Meeting.Server
 
                             //producer.On("@close", _ => ...);
                             //producer.On("transportclose", _ => ...);
-                            producer.Observer.On("close", _ =>
+                            producer.Observer.On("close", async _ =>
                             {
-                                return Task.Run(async () => {
-                                    using (await _producersLock.WriteLockAsync())
-                                    {
-                                        _producers.Remove(producer.ProducerId);
+                                // FIXME: A non-upgradeable read lock is held by the caller and cannot be upgraded.
+                                using (await _producersLock.WriteLockAsync())
+                                {
+                                    _producers.Remove(producer.ProducerId);
 
-                                        await _pullPaddingsLock.WaitAsync();
-                                        _pullPaddings.Clear();
-                                        _pullPaddingsLock.Set();
-                                    }
-                                });
+                                    await _pullPaddingsLock.WaitAsync();
+                                    _pullPaddings.Clear();
+                                    _pullPaddingsLock.Set();
+                                }
                             });
 
                             await _pullPaddingsLock.WaitAsync();
@@ -563,15 +562,14 @@ namespace Tubumu.Meeting.Server
                                 //consumer.On("@close", _ => ...);
                                 //consumer.On("producerclose", _ => ...);
                                 //consumer.On("transportclose", _ => ...);
-                                consumer.Observer.On("close", _ =>
+                                consumer.Observer.On("close", async _ =>
                                 {
-                                    return Task.Run(async () => {
-                                        using (await _consumersLock.WriteLockAsync())
-                                        {
-                                            _consumers.Remove(consumer.ConsumerId);
-                                            producer.RemoveConsumer(consumer.ConsumerId);
-                                        }
-                                    });
+                                    // FIXME: A non-upgradeable read lock is held by the caller and cannot be upgraded.
+                                    using (await _consumersLock.WriteLockAsync())
+                                    {
+                                        _consumers.Remove(consumer.ConsumerId);
+                                        producer.RemoveConsumer(consumer.ConsumerId);
+                                    }
                                 });
 
                                 // Store the Consumer into the consumerPeer data Object.
@@ -906,7 +904,7 @@ namespace Tubumu.Meeting.Server
         }
 
         /// <summary>
-        /// 获取 Transport 状态
+        /// 获取 WebRtcTransport 状态
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
@@ -1033,6 +1031,11 @@ namespace Tubumu.Meeting.Server
             }
         }
 
+        /// <summary>
+        /// 进入房间
+        /// </summary>
+        /// <param name="room"></param>
+        /// <returns></returns>
         public async Task<JoinRoomResult> JoinRoomAsync(Room room)
         {
             using (await _joinedLock.ReadLockAsync())
@@ -1253,11 +1256,11 @@ namespace Tubumu.Meeting.Server
         }
 
         /// <summary>
-        /// 设置 InternalData
+        /// 获取 InternalData
         /// </summary>
         /// <param name="setPeerInternalDataRequest"></param>
         /// <returns></returns>
-        public async Task<PeerInternalDataResult> GetPeerInternalDataAsync(string peerId)
+        public async Task<PeerInternalDataResult> GetPeerInternalDataAsync()
         {
             var peerInternalDataResult = new PeerInternalDataResult();
 

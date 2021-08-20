@@ -245,7 +245,7 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                return await peer.GetPeerInternalDataAsync(peerId);
+                return await peer.GetPeerInternalDataAsync();
             }
         }
 
