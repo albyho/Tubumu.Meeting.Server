@@ -70,6 +70,8 @@ namespace Tubumu.Meeting.Server
 
     public partial class MeetingHub
     {
+        #region Room
+
         /// <summary>
         /// Get RTP capabilities of router.
         /// </summary>
@@ -149,64 +151,9 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        /// <summary>
-        /// Set peer's appData. Then notify other peer, if in a room.
-        /// </summary>
-        /// <param name="setPeerAppDataRequest"></param>
-        /// <returns></returns>
-        [SignalRMethod(name: "SetPeerAppData", operationType: OperationType.Post)]
-        public async Task<MeetingMessage> SetPeerAppData([SignalRArg] SetPeerAppDataRequest setPeerAppDataRequest)
-        {
-            var peerPeerAppDataResult = await _scheduler.SetPeerAppDataAsync(UserId, ConnectionId, setPeerAppDataRequest);
+        #endregion
 
-            // Notification: peerAppDataChanged
-            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
-            {
-                PeerId = UserId,
-                AppData = peerPeerAppDataResult.AppData,
-            });
-
-            return new MeetingMessage { Code = 200, Message = "SetRoomAppData 成功" };
-        }
-
-        /// <summary>
-        /// Unset peer'ss appData. Then notify other peer, if in a room.
-        /// </summary>
-        /// <param name="unsetPeerAppDataRequest"></param>
-        /// <returns></returns>
-        [SignalRMethod(name: "UnsetPeerAppData", operationType: OperationType.Post)]
-        public async Task<MeetingMessage> UnsetPeerAppData([SignalRArg] UnsetPeerAppDataRequest unsetPeerAppDataRequest)
-        {
-            var peerPeerAppDataResult = await _scheduler.UnsetPeerAppDataAsync(UserId, ConnectionId, unsetPeerAppDataRequest);
-
-            // Notification: peerAppDataChanged
-            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
-            {
-                PeerId = UserId,
-                AppData = peerPeerAppDataResult.AppData,
-            });
-
-            return new MeetingMessage { Code = 200, Message = "UnsetPeerAppData 成功" };
-        }
-
-        /// <summary>
-        /// Clear peer's appData. Then notify other peer, if in a room.
-        /// </summary>
-        /// <returns></returns>
-        [SignalRMethod(name: "ClearPeerAppData", operationType: OperationType.Get)]
-        public async Task<MeetingMessage> ClearPeerAppData()
-        {
-            var peerPeerAppDataResult = await _scheduler.ClearPeerAppDataAsync(UserId, ConnectionId);
-
-            // Notification: peerAppDataChanged
-            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
-            {
-                PeerId = UserId,
-                AppData = peerPeerAppDataResult.AppData,
-            });
-
-            return new MeetingMessage { Code = 200, Message = "ClearPeerAppData 成功" };
-        }
+        #region Transport
 
         /// <summary>
         /// Create send WebRTC transport.
@@ -315,6 +262,37 @@ namespace Tubumu.Meeting.Server
             return new MeetingMessage { Code = 200, Message = "ConnectWebRtcTransport 成功" };
         }
 
+        [SignalRMethod(name: "Ready", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> Ready()
+        {
+            if (_meetingServerOptions.ServeMode == ServeMode.Open)
+            {
+                try
+                {
+                    var otherPeers = await _scheduler.GetOtherPeersAsync(UserId, ConnectionId);
+                    foreach (var producerPeer in otherPeers.Where(m => m.PeerId != UserId))
+                    {
+                        var producers = await producerPeer.GetProducersASync();
+                        foreach (var producer in producers.Values)
+                        {
+                            // 本 Peer 消费其他 Peer
+                            CreateConsumer(UserId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore
+                }
+            }
+
+            return new MeetingMessage { Code = 200, Message = "Ready 成功" };
+        }
+
+        #endregion
+
+        #region Pull mode
+
         /// <summary>
         /// Pull medias.
         /// </summary>
@@ -350,6 +328,10 @@ namespace Tubumu.Meeting.Server
             return new MeetingMessage { Code = 200, Message = "Pull 成功" };
         }
 
+        #endregion
+
+        #region Invite mode
+
         /// <summary>
         /// Invite medias.
         /// </summary>
@@ -358,6 +340,11 @@ namespace Tubumu.Meeting.Server
         [SignalRMethod(name: "Invite", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Invite([SignalRArg] InviteRequest inviteRequest)
         {
+            if (_meetingServerOptions.ServeMode != ServeMode.Invite)
+            {
+                throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Invite}\" mode.");
+            }
+
             // TODO: (alby) 仅会议室管理员可以邀请。
             if (inviteRequest.Sources.IsNullOrEmpty()||inviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
             {
@@ -399,6 +386,11 @@ namespace Tubumu.Meeting.Server
         [SignalRMethod(name: "Deinvite", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Deinvite([SignalRArg] DeinviteRequest deinviteRequest)
         {
+            if (_meetingServerOptions.ServeMode != ServeMode.Invite)
+            {
+                throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Invite}\" mode.");
+            }
+
             // TODO: (alby) 仅会议室管理员可以取消邀请。
             if (deinviteRequest.Sources.IsNullOrEmpty() || deinviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
             {
@@ -409,7 +401,7 @@ namespace Tubumu.Meeting.Server
                 };
             }
 
-            // WARN: 暂未校验被邀请方是否有对应的 Source 。也未校验
+            // TODO: (alby) 暂未校验被邀请方是否有对应的 Source 。也未校验
 
             var setPeerControlDataRequest = new UnsetPeerControlDataRequest
             {
@@ -434,6 +426,48 @@ namespace Tubumu.Meeting.Server
 
             return new MeetingMessage { Code = 200, Message = "Deinvite 成功" };
         }
+
+        /// <summary>
+        /// Invite medias.
+        /// </summary>
+        /// <param name="inviteRequest"></param>
+        /// <returns></returns>
+        [SignalRMethod(name: "RequestProduce", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> RequestProduce([SignalRArg] RequestProduceRequest requestProduceRequest)
+        {
+            if (_meetingServerOptions.ServeMode != ServeMode.Invite)
+            {
+                throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Invite}\" mode.");
+            }
+
+            if (requestProduceRequest.Sources.IsNullOrEmpty() || requestProduceRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
+            {
+                return new MeetingMessage<ProduceRespose>
+                {
+                    Code = 400,
+                    Message = $"RequestProduce 失败: Sources 参数缺失或非法。",
+                };
+            }
+
+            // TODO: (alby) 暂未校验否有对应的 Source 。
+
+            // TODO: (alby) 获取会议室管理员 。
+
+            var adminPeerId = string.Empty;
+
+            // Notification: requestProduce
+            SendNotification(adminPeerId, "requestProduce", new
+            {
+                PeerId = UserId,
+                ProduceSources = requestProduceRequest.Sources
+            });
+
+            return new MeetingMessage { Code = 200, Message = "RequestProduce 成功" };
+        }
+
+        #endregion
+
+        #region Producer
 
         /// <summary>
         /// Produce media.
@@ -557,6 +591,10 @@ namespace Tubumu.Meeting.Server
             return new MeetingMessage { Code = 200, Message = "ResumeProducer 成功" };
         }
 
+        #endregion
+
+        #region Consumer
+
         /// <summary>
         /// Close consumer.
         /// </summary>
@@ -668,6 +706,10 @@ namespace Tubumu.Meeting.Server
             return new MeetingMessage { Code = 200, Message = "RequestConsumerKeyFrame 成功" };
         }
 
+        #endregion
+
+        #region Stats
+
         /// <summary>
         /// Get transport's state.
         /// </summary>
@@ -716,6 +758,10 @@ namespace Tubumu.Meeting.Server
             return new MeetingMessage<IceParameters?> { Code = 200, Message = "RestartIce 成功", Data = iceParameters };
         }
 
+        #endregion
+
+        #region Message
+
         /// <summary>
         /// Send message to other peers in rooms.
         /// </summary>
@@ -735,6 +781,71 @@ namespace Tubumu.Meeting.Server
 
             return new MeetingMessage { Code = 200, Message = "SendMessage 成功" };
         }
+
+        #endregion
+
+        #region PeerAppData
+
+        /// <summary>
+        /// Set peer's appData. Then notify other peer, if in a room.
+        /// </summary>
+        /// <param name="setPeerAppDataRequest"></param>
+        /// <returns></returns>
+        [SignalRMethod(name: "SetPeerAppData", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> SetPeerAppData([SignalRArg] SetPeerAppDataRequest setPeerAppDataRequest)
+        {
+            var peerPeerAppDataResult = await _scheduler.SetPeerAppDataAsync(UserId, ConnectionId, setPeerAppDataRequest);
+
+            // Notification: peerAppDataChanged
+            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
+            {
+                PeerId = UserId,
+                AppData = peerPeerAppDataResult.AppData,
+            });
+
+            return new MeetingMessage { Code = 200, Message = "SetRoomAppData 成功" };
+        }
+
+        /// <summary>
+        /// Unset peer'ss appData. Then notify other peer, if in a room.
+        /// </summary>
+        /// <param name="unsetPeerAppDataRequest"></param>
+        /// <returns></returns>
+        [SignalRMethod(name: "UnsetPeerAppData", operationType: OperationType.Post)]
+        public async Task<MeetingMessage> UnsetPeerAppData([SignalRArg] UnsetPeerAppDataRequest unsetPeerAppDataRequest)
+        {
+            var peerPeerAppDataResult = await _scheduler.UnsetPeerAppDataAsync(UserId, ConnectionId, unsetPeerAppDataRequest);
+
+            // Notification: peerAppDataChanged
+            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
+            {
+                PeerId = UserId,
+                AppData = peerPeerAppDataResult.AppData,
+            });
+
+            return new MeetingMessage { Code = 200, Message = "UnsetPeerAppData 成功" };
+        }
+
+        /// <summary>
+        /// Clear peer's appData. Then notify other peer, if in a room.
+        /// </summary>
+        /// <returns></returns>
+        [SignalRMethod(name: "ClearPeerAppData", operationType: OperationType.Get)]
+        public async Task<MeetingMessage> ClearPeerAppData()
+        {
+            var peerPeerAppDataResult = await _scheduler.ClearPeerAppDataAsync(UserId, ConnectionId);
+
+            // Notification: peerAppDataChanged
+            SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
+            {
+                PeerId = UserId,
+                AppData = peerPeerAppDataResult.AppData,
+            });
+
+            return new MeetingMessage { Code = 200, Message = "ClearPeerAppData 成功" };
+        }
+
+        #endregion
 
         #region Private Methods
 

@@ -624,6 +624,21 @@ namespace Tubumu.Meeting.Server
             }
         }
 
+        public async Task<Peer[]> GetOtherPeersAsync(string peerId, string connectionId)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(peerId, out var peer))
+                {
+                    throw new Exception($"GetOtherPeersAsync() | Peer:{peerId} is not exists.");
+                }
+
+                CheckConnection(peer, connectionId);
+
+                return await peer.GetOtherPeersAsync();
+            }
+        }
+
         private void CheckConnection(Peer peer, string connectionId)
         {
             if (peer.ConnectionId != connectionId)

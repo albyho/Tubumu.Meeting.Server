@@ -86,7 +86,15 @@ namespace Tubumu.Meeting.Server
 
         private readonly AsyncReaderWriterLock _consumersLock = new AsyncReaderWriterLock();
 
-        private readonly Dictionary<string, Producer> _producers = new Dictionary<string, Producer>();
+        private Dictionary<string, Producer> _producers = new Dictionary<string, Producer>();
+
+        public async Task<Dictionary<string, Producer>> GetProducersASync()
+        {
+            using(await _producersLock.ReadLockAsync())
+            {
+                return _producers;
+            }
+        }
 
         private readonly AsyncReaderWriterLock _producersLock = new AsyncReaderWriterLock();
 
@@ -94,9 +102,9 @@ namespace Tubumu.Meeting.Server
 
         private readonly AsyncReaderWriterLock _dataConsumersLock = new AsyncReaderWriterLock();
 
-        private readonly Dictionary<string, DataProducer> _dataProducers = new Dictionary<string, DataProducer>();
+        private Dictionary<string, DataProducer> _dataProducers = new Dictionary<string, DataProducer>();
 
-        private readonly AsyncReaderWriterLock _dataProducersLock = new AsyncReaderWriterLock();
+        private readonly AsyncReaderWriterLock __dataProducersLock = new AsyncReaderWriterLock();
 
         private readonly List<PullPadding> _pullPaddings = new List<PullPadding>();
 
@@ -462,16 +470,18 @@ namespace Tubumu.Meeting.Server
 
                             //producer.On("@close", _ => ...);
                             //producer.On("transportclose", _ => ...);
-                            producer.Observer.On("close", async _ =>
+                            producer.Observer.On("close", _ =>
                             {
-                                using (await _producersLock.WriteLockAsync())
-                                {
-                                    _producers.Remove(producer.ProducerId);
+                                return Task.Run(async () => {
+                                    using (await _producersLock.WriteLockAsync())
+                                    {
+                                        _producers.Remove(producer.ProducerId);
 
-                                    await _pullPaddingsLock.WaitAsync();
-                                    _pullPaddings.Clear();
-                                    _pullPaddingsLock.Set();
-                                }
+                                        await _pullPaddingsLock.WaitAsync();
+                                        _pullPaddings.Clear();
+                                        _pullPaddingsLock.Set();
+                                    }
+                                });
                             });
 
                             await _pullPaddingsLock.WaitAsync();
@@ -549,13 +559,15 @@ namespace Tubumu.Meeting.Server
                                 //consumer.On("@close", _ => ...);
                                 //consumer.On("producerclose", _ => ...);
                                 //consumer.On("transportclose", _ => ...);
-                                consumer.Observer.On("close", async _ =>
+                                consumer.Observer.On("close", _ =>
                                 {
-                                    using (await _consumersLock.WriteLockAsync())
-                                    {
-                                        _consumers.Remove(consumer.ConsumerId);
-                                        producer.RemoveConsumer(consumer.ConsumerId);
-                                    }
+                                    return Task.Run(async () => {
+                                        using (await _consumersLock.WriteLockAsync())
+                                        {
+                                            _consumers.Remove(consumer.ConsumerId);
+                                            producer.RemoveConsumer(consumer.ConsumerId);
+                                        }
+                                    });
                                 });
 
                                 // Store the Consumer into the consumerPeer data Object.
