@@ -107,6 +107,7 @@ namespace Tubumu.Meeting.Server
         [SignalRMethod(name: "JoinRoom", operationType: OperationType.Post)]
         public async Task<MeetingMessage<JoinRoomResponse>> JoinRoom([SignalRArg] JoinRoomRequest joinRoomRequest)
         {
+            // FIXME: (alby)明文告知用户进入房间的 Role 存在安全问题, 特别是 Invite 模式下。
             var joinRoomResult = await _scheduler.JoinRoomAsync(UserId, ConnectionId, joinRoomRequest);
             if(joinRoomResult == null)
             {
