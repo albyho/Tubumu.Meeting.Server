@@ -11,10 +11,8 @@ namespace Tubumu.Meeting.Server
         public string[] OtherPeerIds { get; set; }
     }
 
-    public class PeerControlDataResult
+    public class PeerInternalDataResult
     {
-        public Dictionary<string, object> ControlData { get; set; }
-
-        public string[] PeerIds { get; set; }
+        public Dictionary<string, object> InternalData { get; set; }
     }
 }

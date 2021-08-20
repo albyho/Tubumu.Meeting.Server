@@ -265,7 +265,7 @@ namespace Tubumu.Meeting.Server
         [SignalRMethod(name: "Ready", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Ready()
         {
-            if (_meetingServerOptions.ServeMode == ServeMode.Open)
+            if (_meetingServerOptions.ServeMode == ServeMode.Open || _meetingServerOptions.ServeMode == ServeMode.Invite)
             {
                 try
                 {
@@ -345,7 +345,18 @@ namespace Tubumu.Meeting.Server
                 throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Invite}\" mode.");
             }
 
-            // TODO: (alby) 仅会议室管理员可以邀请。
+            // 仅会议室管理员可以邀请。
+            if(await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
+            {
+                return new MeetingMessage { Code = 400, Message = "仅管理员可发起邀请。" };
+            }
+
+            // 管理员无需邀请自己。
+            if(inviteRequest.PeerId == UserId)
+            {
+                return new MeetingMessage { Code = 400, Message = "管理员请勿邀请自己。" };
+            }
+
             if (inviteRequest.Sources.IsNullOrEmpty()||inviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
             {
                 return new MeetingMessage<ProduceRespose>
@@ -355,22 +366,22 @@ namespace Tubumu.Meeting.Server
                 };
             }
 
-            // WARN: 暂未校验被邀请方是否有对应的 Source 。
+            // NOTE: 暂未校验被邀请方是否有对应的 Source 。不过就算接收邀请也无法生产。
 
-            var setPeerControlDataRequest = new SetPeerControlDataRequest
+            var setPeerInternalDataRequest = new SetPeerInternalDataRequest
             {
-                PeerId = inviteRequest.ProducerPeerId,
-                PeerControlData = new Dictionary<string, object>()
+                PeerId = inviteRequest.PeerId,
+                InternalData = new Dictionary<string, object>()
             };
             foreach (var source in inviteRequest.Sources)
             {
-                setPeerControlDataRequest.PeerControlData[$"Invate:{source}"] = true;
+                setPeerInternalDataRequest.InternalData[$"Invate:{source}"] = true;
             };
 
-            await _scheduler.SetPeerControlDataAsync(setPeerControlDataRequest);
+            await _scheduler.SetPeerInternalDataAsync(setPeerInternalDataRequest);
 
             // Notification: produceSources
-            SendNotification(inviteRequest.ProducerPeerId, "produceSources", new
+            SendNotification(inviteRequest.PeerId, "produceSources", new
             {
                 ProduceSources = inviteRequest.Sources
             });
@@ -391,7 +402,18 @@ namespace Tubumu.Meeting.Server
                 throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Invite}\" mode.");
             }
 
-            // TODO: (alby) 仅会议室管理员可以取消邀请。
+            // 仅会议室管理员可以取消邀请。
+            if (await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
+            {
+                return new MeetingMessage { Code = 400, Message = "仅管理员可取消邀请。" };
+            }
+
+            // 管理员无需取消邀请自己。
+            if (deinviteRequest.PeerId == UserId)
+            {
+                return new MeetingMessage { Code = 400, Message = "管理员请勿取消邀请自己。" };
+            }
+
             if (deinviteRequest.Sources.IsNullOrEmpty() || deinviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
             {
                 return new MeetingMessage<ProduceRespose>
@@ -401,25 +423,25 @@ namespace Tubumu.Meeting.Server
                 };
             }
 
-            // TODO: (alby) 暂未校验被邀请方是否有对应的 Source 。也未校验
+            // NOTE: 暂未校验被邀请方是否有对应的 Source 。也未校验对应 Source 是否收到邀请。
 
-            var setPeerControlDataRequest = new UnsetPeerControlDataRequest
+            var unSetPeerInternalDataRequest = new UnsetPeerInternalDataRequest
             {
-                PeerId = deinviteRequest.ProducerPeerId,
+                PeerId = deinviteRequest.PeerId,
             };
             var keys = new List<string>();
             foreach (var source in deinviteRequest.Sources)
             {
                 keys.Add($"Invate:{source}");
             };
-            setPeerControlDataRequest.Keys = keys.ToArray();
+            unSetPeerInternalDataRequest.Keys = keys.ToArray();
 
-            await _scheduler.UnsetPeerControlDataAsync(setPeerControlDataRequest);
+            await _scheduler.UnsetPeerInternalDataAsync(unSetPeerInternalDataRequest);
 
-            await _scheduler.CloseProducerWithSourcesAsync(deinviteRequest.ProducerPeerId, deinviteRequest.Sources);
+            await _scheduler.CloseProducerWithSourcesAsync(deinviteRequest.PeerId, deinviteRequest.Sources);
 
             // Notification: closeSources
-            SendNotification(deinviteRequest.ProducerPeerId, "closeSources", new
+            SendNotification(deinviteRequest.PeerId, "closeSources", new
             {
                 CloseSources = deinviteRequest.Sources
             });
@@ -428,7 +450,7 @@ namespace Tubumu.Meeting.Server
         }
 
         /// <summary>
-        /// Invite medias.
+        /// Request produce medias.
         /// </summary>
         /// <param name="inviteRequest"></param>
         /// <returns></returns>
@@ -440,6 +462,12 @@ namespace Tubumu.Meeting.Server
                 throw new NotSupportedException($"Not supported on \"{_meetingServerOptions.ServeMode}\" mode. Needs \"{ServeMode.Invite}\" mode.");
             }
 
+            // 管理员无需发出申请。
+            if (await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) == UserRole.Admin)
+            {
+                return new MeetingMessage { Code = 400, Message = "管理员无需发出申请。" };
+            }
+
             if (requestProduceRequest.Sources.IsNullOrEmpty() || requestProduceRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
             {
                 return new MeetingMessage<ProduceRespose>
@@ -449,14 +477,12 @@ namespace Tubumu.Meeting.Server
                 };
             }
 
-            // TODO: (alby) 暂未校验否有对应的 Source 。
+            // NOTE: 暂未校验被邀请方是否有对应的 Source 。不过就算接收邀请也无法生产。
 
-            // TODO: (alby) 获取会议室管理员 。
-
-            var adminPeerId = string.Empty;
+            var adminIds = await _scheduler.GetOtherPeerIdsAsync(UserId, ConnectionId, UserRole.Admin);
 
             // Notification: requestProduce
-            SendNotification(adminPeerId, "requestProduce", new
+            SendNotification(adminIds, "requestProduce", new
             {
                 PeerId = UserId,
                 ProduceSources = requestProduceRequest.Sources
@@ -487,7 +513,7 @@ namespace Tubumu.Meeting.Server
             ProduceResult produceResult;
             try
             {
-                // WARN: 在 Invate 模式下暂未校验是否被邀请 。
+                // TODO: (alby) [会议模式相关]在 Invate 模式下需验证生产的 Source 是否被邀请。如果不是管理员需校验是否被邀请。
                 produceResult = await _scheduler.ProduceAsync(peerId, ConnectionId, produceRequest);
             }
             catch (Exception ex)

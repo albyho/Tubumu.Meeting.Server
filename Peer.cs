@@ -27,7 +27,7 @@ namespace Tubumu.Meeting.Server
         public ConcurrentDictionary<string, object> AppData { get; set; }
 
         [JsonIgnore]
-        public ConcurrentDictionary<string, object> ControlData { get; set; }
+        public ConcurrentDictionary<string, object> InternalData { get; set; }
 
         public bool Equals(Peer other)
         {
@@ -114,6 +114,8 @@ namespace Tubumu.Meeting.Server
 
         private readonly AsyncReaderWriterLock _roomLock = new AsyncReaderWriterLock();
 
+        public const string RoleKey = "role";
+
         public Peer(ILoggerFactory loggerFactory,
             WebRtcTransportSettings webRtcTransportSettings,
             PlainTransportSettings plainTransportSettings,
@@ -136,6 +138,7 @@ namespace Tubumu.Meeting.Server
             DisplayName = displayName.NullOrWhiteSpaceReplace("User:" + peerId.ToString().PadLeft(8, '0'));
             Sources = sources ?? Array.Empty<string>();
             AppData = new ConcurrentDictionary<string, object>(appData ?? new Dictionary<string, object>());
+            InternalData = new ConcurrentDictionary<string, object>(appData ?? new Dictionary<string, object>());
             _pullPaddingsLock.Set();
             _joined = true;
         }
@@ -1148,7 +1151,7 @@ namespace Tubumu.Meeting.Server
             {
                 CheckJoined();
 
-                foreach (var item in setPeerAppDataRequest.PeerAppData)
+                foreach (var item in setPeerAppDataRequest.AppData)
                 {
                     AppData.AddOrUpdate(item.Key, item.Value, (oldKey, oldValue) => item.Value);
                 }
@@ -1226,116 +1229,85 @@ namespace Tubumu.Meeting.Server
         }
 
         /// <summary>
-        /// 设置 ControlData
+        /// 设置 InternalData
         /// </summary>
-        /// <param name="setPeerControlDataRequest"></param>
+        /// <param name="setPeerInternalDataRequest"></param>
         /// <returns></returns>
-        public async Task<PeerControlDataResult> SetPeerControlDataAsync(SetPeerControlDataRequest setPeerControlDataRequest)
+        public async Task<PeerInternalDataResult> SetPeerInternalDataAsync(SetPeerInternalDataRequest setPeerInternalDataRequest)
         {
-            var peerControlDataResult = new PeerControlDataResult
-            {
-                PeerIds = Array.Empty<string>(),
-            };
+            var peerInternalDataResult = new PeerInternalDataResult();
 
             using (await _joinedLock.ReadLockAsync())
             {
                 CheckJoined();
 
-                foreach (var item in setPeerControlDataRequest.PeerControlData)
+                foreach (var item in setPeerInternalDataRequest.InternalData)
                 {
-                    ControlData.AddOrUpdate(item.Key, item.Value, (oldKey, oldValue) => item.Value);
+                    InternalData.AddOrUpdate(item.Key, item.Value, (oldKey, oldValue) => item.Value);
                 }
 
-                peerControlDataResult.ControlData = ControlData.ToDictionary(x => x.Key, x => x.Value);
-
-                using (await _roomLock.ReadLockAsync())
-                {
-                    peerControlDataResult.PeerIds = await GetPeerIdsInteralAsync();
-                    return peerControlDataResult;
-                }
+                peerInternalDataResult.InternalData = InternalData.ToDictionary(x => x.Key, x => x.Value);
+                return peerInternalDataResult;
             }
         }
 
         /// <summary>
-        /// 移除 ControlData
+        /// 移除 InternalData
         /// </summary>
-        /// <param name="unsetPeerControlDataRequest"></param>
+        /// <param name="unsetPeerInternalDataRequest"></param>
         /// <returns></returns>
-        public async Task<PeerControlDataResult> UnsetPeerControlDataAsync(UnsetPeerControlDataRequest unsetPeerControlDataRequest)
+        public async Task<PeerInternalDataResult> UnsetPeerInternalDataAsync(UnsetPeerInternalDataRequest unsetPeerInternalDataRequest)
         {
-            var peerControlDataResult = new PeerControlDataResult
-            {
-                PeerIds = Array.Empty<string>(),
-            };
+            var peerInternalDataResult = new PeerInternalDataResult();
 
             using (await _joinedLock.ReadLockAsync())
             {
                 CheckJoined();
 
-                foreach (var item in unsetPeerControlDataRequest.Keys)
+                foreach (var item in unsetPeerInternalDataRequest.Keys)
                 {
                     AppData.TryRemove(item, out var _);
                 }
 
-                peerControlDataResult.ControlData = ControlData.ToDictionary(x => x.Key, x => x.Value);
-
-                using (await _roomLock.ReadLockAsync())
-                {
-                    peerControlDataResult.PeerIds = await GetPeerIdsInteralAsync();
-                    return peerControlDataResult;
-                }
+                peerInternalDataResult.InternalData = InternalData.ToDictionary(x => x.Key, x => x.Value);
+                return peerInternalDataResult;
             }
         }
 
         /// <summary>
-        /// 清空 ControlData
+        /// 清空 InternalData
         /// </summary>
         /// <returns></returns>
-        public async Task<PeerControlDataResult> ClearPeerControlDataAsync()
+        public async Task<PeerInternalDataResult> ClearPeerInternalDataAsync()
         {
-            var peerControlDataResult = new PeerControlDataResult
+            var peerInternalDataResult = new PeerInternalDataResult
             {
-                PeerIds = Array.Empty<string>(),
-                ControlData = new Dictionary<string, object>()
+                InternalData = new Dictionary<string, object>()
             };
 
             using (await _joinedLock.ReadLockAsync())
             {
                 CheckJoined();
 
-                ControlData.Clear();
+                InternalData.Clear();
 
-                using (await _roomLock.ReadLockAsync())
-                {
-                    peerControlDataResult.PeerIds = await GetPeerIdsInteralAsync();
-                    return peerControlDataResult;
-                }
+                return peerInternalDataResult;
             }
         }
 
         /// <summary>
         /// 获取 Room 内其他 Peer 的 Id
         /// </summary>
-        public async Task<string[]> GetOtherPeerIdsAsync()
+        public async Task<string[]> GetOtherPeerIdsAsync(UserRole? role = null)
         {
-            using (await _joinedLock.ReadLockAsync())
-            {
-                CheckJoined();
-
-                using (await _roomLock.ReadLockAsync())
-                {
-                    CheckRoom();
-
-                    var allPeerIds = await GetPeerIdsInteralAsync();
-                    return allPeerIds.Where(m => m != PeerId).ToArray();
-                }
-            }
+            var peers = await GetOtherPeersAsync(role);
+            return peers.Select(m => m.PeerId).ToArray();
         }
 
         /// <summary>
         /// 获取 Room 内其他 Peer
         /// </summary>
-        public async Task<Peer[]> GetOtherPeersAsync()
+        public async Task<Peer[]> GetOtherPeersAsync(UserRole? role = null)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -1346,8 +1318,32 @@ namespace Tubumu.Meeting.Server
                     CheckRoom();
 
                     var allPeers = await GetPeersInteralAsync();
-                    return allPeers.Where(m => m.PeerId != PeerId).ToArray();
+                    var query = allPeers.Where(m => m.PeerId != PeerId);
+                    if (role.HasValue)
+                    {
+                        query = query.Where(m => m.InternalData.TryGetValue(RoleKey, out var r) && r.GetType() == typeof(UserRole) && (UserRole)r == role.Value);
+                    }
+                    return query.ToArray();
                 }
+            }
+        }
+
+        /// <summary>
+        /// 获取用户角色
+        /// </summary>
+        /// <returns></returns>
+        public async Task<UserRole> GetRoleAsync()
+        {
+            using (await _joinedLock.ReadLockAsync())
+            {
+                CheckJoined();
+
+                if(InternalData.TryGetValue(RoleKey, out var role) && role.GetType() == typeof(UserRole))
+                {
+                    return (UserRole)role;
+                }
+
+                return UserRole.Normal;
             }
         }
 

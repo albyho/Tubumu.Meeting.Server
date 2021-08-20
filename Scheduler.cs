@@ -142,7 +142,17 @@ namespace Tubumu.Meeting.Server
                         _rooms[room.RoomId] = room;
                     }
 
-                    return await peer.JoinRoomAsync(room);
+                    var result = await peer.JoinRoomAsync(room);
+
+                    await peer.SetPeerInternalDataAsync(new SetPeerInternalDataRequest
+                    {
+                        InternalData = new Dictionary<string, object>
+                        {
+                            { Peer.RoleKey, joinRoomRequest.Role }
+                        }
+                    });
+
+                    return result;
                 }
                 finally
                 {
@@ -211,42 +221,42 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<PeerControlDataResult> SetPeerControlDataAsync(SetPeerControlDataRequest setPeerControlDataRequest)
+        public async Task<PeerInternalDataResult> SetPeerInternalDataAsync(SetPeerInternalDataRequest setPeerInternalDataRequest)
         {
             using (await _peersLock.ReadLockAsync())
             {
-                if (!_peers.TryGetValue(setPeerControlDataRequest.PeerId, out var peer))
+                if (!_peers.TryGetValue(setPeerInternalDataRequest.PeerId, out var peer))
                 {
-                    throw new Exception($"SetPeerControlDataAsync() | Peer:{setPeerControlDataRequest.PeerId} is not exists.");
+                    throw new Exception($"SetPeerInternalDataAsync() | Peer:{setPeerInternalDataRequest.PeerId} is not exists.");
                 }
 
-                return await peer.SetPeerControlDataAsync(setPeerControlDataRequest);
+                return await peer.SetPeerInternalDataAsync(setPeerInternalDataRequest);
             }
         }
 
-        public async Task<PeerControlDataResult> UnsetPeerControlDataAsync(UnsetPeerControlDataRequest unsetPeerControlDataRequest)
+        public async Task<PeerInternalDataResult> UnsetPeerInternalDataAsync(UnsetPeerInternalDataRequest unsetPeerInternalDataRequest)
         {
             using (await _peersLock.ReadLockAsync())
             {
-                if (!_peers.TryGetValue(unsetPeerControlDataRequest.PeerId, out var peer))
+                if (!_peers.TryGetValue(unsetPeerInternalDataRequest.PeerId, out var peer))
                 {
-                    throw new Exception($"UnsetPeerControlDataAsync() | Peer:{unsetPeerControlDataRequest.PeerId} is not exists.");
+                    throw new Exception($"UnsetPeerInternalDataAsync() | Peer:{unsetPeerInternalDataRequest.PeerId} is not exists.");
                 }
 
-                return await peer.UnsetPeerControlDataAsync(unsetPeerControlDataRequest);
+                return await peer.UnsetPeerInternalDataAsync(unsetPeerInternalDataRequest);
             }
         }
 
-        public async Task<PeerControlDataResult> ClearPeerControlDataAsync(string targetPeerId)
+        public async Task<PeerInternalDataResult> ClearPeerInternalDataAsync(string targetPeerId)
         {
             using (await _peersLock.ReadLockAsync())
             {
                 if (!_peers.TryGetValue(targetPeerId, out var peer))
                 {
-                    throw new Exception($"ClearPeerControlDataAsync() | Peer:{targetPeerId} is not exists.");
+                    throw new Exception($"ClearPeerInternalDataAsync() | Peer:{targetPeerId} is not exists.");
                 }
 
-                return await peer.ClearPeerControlDataAsync();
+                return await peer.ClearPeerInternalDataAsync();
             }
         }
 
@@ -609,7 +619,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<string[]> GetOtherPeerIdsAsync(string peerId, string connectionId)
+        public async Task<string[]> GetOtherPeerIdsAsync(string peerId, string connectionId, UserRole? role = null)
         {
             using (await _peersLock.ReadLockAsync())
             {
@@ -620,11 +630,11 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                return await peer.GetOtherPeerIdsAsync();
+                return await peer.GetOtherPeerIdsAsync(role);
             }
         }
 
-        public async Task<Peer[]> GetOtherPeersAsync(string peerId, string connectionId)
+        public async Task<Peer[]> GetOtherPeersAsync(string peerId, string connectionId, UserRole? role = null)
         {
             using (await _peersLock.ReadLockAsync())
             {
@@ -635,7 +645,22 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                return await peer.GetOtherPeersAsync();
+                return await peer.GetOtherPeersAsync(role);
+            }
+        }
+
+        public async Task<UserRole> GetPeerRoleAsync(string peerId, string connectionId)
+        {
+            using (await _peersLock.ReadLockAsync())
+            {
+                if (!_peers.TryGetValue(peerId, out var peer))
+                {
+                    throw new Exception($"GetPeerRoleAsync() | Peer:{peerId} is not exists.");
+                }
+
+                CheckConnection(peer, connectionId);
+
+                return await peer.GetRoleAsync();
             }
         }
 
