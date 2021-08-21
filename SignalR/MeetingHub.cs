@@ -510,7 +510,7 @@ namespace Tubumu.Meeting.Server
         [SignalRMethod(name: "Produce", operationType: OperationType.Post)]
         public async Task<MeetingMessage<ProduceRespose>> Produce([SignalRArg] ProduceRequest produceRequest)
         {
-            // HACK: Android 传入 RtpParameters 有误的临时处理方案
+            // HACK: (alby) Android 传入 RtpParameters 有误的临时处理方案
             if (produceRequest.Kind == MediaKind.Audio)
             {
                 produceRequest.RtpParameters.Codecs[0].Channels = 2;
