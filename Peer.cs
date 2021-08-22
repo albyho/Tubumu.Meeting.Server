@@ -425,7 +425,7 @@ namespace Tubumu.Meeting.Server
 
             if (Sources == null || !Sources.Contains(produceRequest.Source))
             {
-                throw new Exception($"ProduceAsync() | Source:\"{ produceRequest.Source }\" cannot be produce.");
+                throw new Exception($"ProduceAsync() | Source:\"{produceRequest.Source}\" cannot be produce.");
             }
 
             // Add peerId into appData to later get the associated Peer during
@@ -600,7 +600,8 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    using (await _producersLock.ReadLockAsync())
+                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    using (await _producersLock.WriteLockAsync())
                     {
                         if (!_producers.TryGetValue(producerId, out var producer))
                         {
@@ -629,7 +630,8 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    using (await _producersLock.ReadLockAsync())
+                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    using (await _producersLock.WriteLockAsync())
                     {
                         var producers = _producers.Values.ToArray();
                         foreach (var producer in producers)
@@ -657,7 +659,8 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    using (await _producersLock.ReadLockAsync())
+                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    using (await _producersLock.WriteLockAsync())
                     {
                         var producers = _producers.Values.Where(m => sources.Contains(m.Source)).ToArray();
                         foreach (var producer in producers)
@@ -744,7 +747,8 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    using (await _consumersLock.ReadLockAsync())
+                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    using (await _consumersLock.WriteLockAsync())
                     {
                         if (!_consumers.TryGetValue(consumerId, out var consumer))
                         {
