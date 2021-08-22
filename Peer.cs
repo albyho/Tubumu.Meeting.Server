@@ -201,12 +201,10 @@ namespace Tubumu.Meeting.Server
                         _transports[transport.TransportId] = transport;
                     }
 
-                    transport.Observer.On("close", async _ =>
+                    transport.Observer.On("close", _ =>
                     {
-                        using (await _transportsLock.WriteLockAsync())
-                        {
-                            _transports.Remove(transport.TransportId);
-                        }
+                        _transports.Remove(transport.TransportId);
+                        return Task.CompletedTask;
                     });
 
                     // If set, apply max incoming bitrate limit.
@@ -235,6 +233,7 @@ namespace Tubumu.Meeting.Server
                 using (await _roomLock.ReadLockAsync())
                 {
                     CheckRoom();
+
                     using (await _transportsLock.ReadLockAsync())
                     {
                         if (!_transports.TryGetValue(connectWebRtcTransportRequest.TransportId, out var transport))
@@ -289,12 +288,10 @@ namespace Tubumu.Meeting.Server
                         _transports[transport.TransportId] = transport;
                     }
 
-                    transport.Observer.On("close", async _ =>
+                    transport.Observer.On("close", _ =>
                     {
-                        using (await _transportsLock.WriteLockAsync())
-                        {
-                            _transports.Remove(transport.TransportId);
-                        }
+                        _transports.Remove(transport.TransportId);
+                        return Task.CompletedTask;
                     });
 
                     return transport;
@@ -476,15 +473,11 @@ namespace Tubumu.Meeting.Server
                             //producer.On("transportclose", _ => ...);
                             producer.Observer.On("close", async _ =>
                             {
-                                // FIXME: (alby)A non-upgradeable read lock is held by the caller and cannot be upgraded.
-                                using (await _producersLock.WriteLockAsync())
-                                {
-                                    _producers.Remove(producer.ProducerId);
+                                _producers.Remove(producer.ProducerId);
 
-                                    await _pullPaddingsLock.WaitAsync();
-                                    _pullPaddings.Clear();
-                                    _pullPaddingsLock.Set();
-                                }
+                                await _pullPaddingsLock.WaitAsync();
+                                _pullPaddings.Clear();
+                                _pullPaddingsLock.Set();
                             });
 
                             await _pullPaddingsLock.WaitAsync();
@@ -562,14 +555,11 @@ namespace Tubumu.Meeting.Server
                                 //consumer.On("@close", _ => ...);
                                 //consumer.On("producerclose", _ => ...);
                                 //consumer.On("transportclose", _ => ...);
-                                consumer.Observer.On("close", async _ =>
+                                consumer.Observer.On("close", _ =>
                                 {
-                                    // FIXME: (alby)A non-upgradeable read lock is held by the caller and cannot be upgraded.
-                                    using (await _consumersLock.WriteLockAsync())
-                                    {
-                                        _consumers.Remove(consumer.ConsumerId);
-                                        producer.RemoveConsumer(consumer.ConsumerId);
-                                    }
+                                    _consumers.Remove(consumer.ConsumerId);
+                                    producer.RemoveConsumer(consumer.ConsumerId);
+                                    return Task.CompletedTask;
                                 });
 
                                 // Store the Consumer into the consumerPeer data Object.
@@ -755,7 +745,7 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"CloseConsumerAsync() | Peer:{PeerId} has no Cmonsumer:{consumerId}.");
                         }
 
-                        await consumer.CloseAsync();
+                        consumer.CloseAsync().ContinueWithOnFaultedHandleLog(_logger);
                         return true;
                     }
                 }
@@ -1074,7 +1064,7 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    // !!!注意：这里要用 WriteLockAsync，否则 Transport 的 close 事件将报异常：不可升级的读取锁由调用方持有，无法升级。
+                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
                     using (await _transportsLock.WriteLockAsync())
                     {
                         // Iterate and close all mediasoup Transport associated to this Peer, so all
@@ -1119,7 +1109,7 @@ namespace Tubumu.Meeting.Server
 
                 using (await _roomLock.WriteLockAsync())
                 {
-                    // !!!注意：这里要用 WriteLockAsync，否则 Transport 的 close 事件将报异常：不可升级的读取锁由调用方持有，无法升级。
+                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
                     using (await _transportsLock.WriteLockAsync())
                     {
                         // Iterate and close all mediasoup Transport associated to this Peer, so all
