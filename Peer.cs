@@ -1002,7 +1002,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        public async Task<IceParameters?> RestartIceAsync(string transportId)
+        public async Task<IceParameters> RestartIceAsync(string transportId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -1395,7 +1395,7 @@ namespace Tubumu.Meeting.Server
         {
             if (!_joined)
             {
-                throw new Exception($"CheckClosed() | Peer:{PeerId} is not joined.");
+                throw new PeerNotJoinedException(PeerId);
             }
         }
 
@@ -1403,7 +1403,7 @@ namespace Tubumu.Meeting.Server
         {
             if (_room == null)
             {
-                throw new Exception($"CheckRoom() | Peer:{PeerId} is not in any room.");
+                throw new PeerNotInAnyRoomException(PeerId);
             }
         }
 

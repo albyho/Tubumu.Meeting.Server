@@ -61,6 +61,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (_peers.TryGetValue(peerId, out var peer))
                 {
+                    // 客户端多次调用 `Join`
                     if (peer.ConnectionId == connectionId)
                     {
                         _logger.LogError($"PeerJoinAsync() | Peer:{peerId} was joined.");
@@ -86,14 +87,13 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<LeaveResult?> LeaveAsync(string peerId)
+        public async Task<LeaveResult> LeaveAsync(string peerId)
         {
             using (await _peersLock.WriteLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    // _logger.LogWarning($"PeerLeave() | Peer:{peerId} is not exists.");
-                    return null;
+                    throw new PeerNotExistsException("LeaveAsync()", peerId);
                 }
 
                 _peers.Remove(peerId);
@@ -102,23 +102,16 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<JoinRoomResult?> JoinRoomAsync(string peerId, string connectionId, JoinRoomRequest joinRoomRequest)
+        public async Task<JoinRoomResult> JoinRoomAsync(string peerId, string connectionId, JoinRoomRequest joinRoomRequest)
         {
             using (await _peersLock.ReadLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    _logger.LogError($"JoinRoomAsync() | Peer:{peerId} is not exists.");
-                    return null;
+                    throw new PeerNotExistsException("JoinRoomAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
-
-                if (peer.Sources.Except(peer.Sources).Any())
-                {
-                    _logger.LogError($"JoinRoomAsync() | Peer:{peerId} don't has some sources which is in Room:{joinRoomRequest.RoomId}.");
-                    return null;
-                }
 
                 await _roomsLock.WaitAsync();
                 try
@@ -159,7 +152,7 @@ namespace Tubumu.Meeting.Server
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "JoinRoomAsync()");
-                    return null;
+                    throw;
                 }
                 finally
                 {
@@ -174,7 +167,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"LeaveRoom() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("LeaveRoomAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -189,7 +182,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"SetPeerAppDataAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("SetPeerAppDataAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -204,7 +197,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"UnsetPeerAppDataAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("UnsetPeerAppDataAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -219,7 +212,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"ClearPeerAppDataAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("ClearPeerAppDataAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -234,7 +227,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(setPeerInternalDataRequest.PeerId, out var peer))
                 {
-                    throw new Exception($"SetPeerInternalDataAsync() | Peer:{setPeerInternalDataRequest.PeerId} is not exists.");
+                    throw new PeerNotExistsException("SetPeerInternalDataAsync()", setPeerInternalDataRequest.PeerId);
                 }
 
                 return await peer.SetPeerInternalDataAsync(setPeerInternalDataRequest);
@@ -247,7 +240,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetPeerInternalDataAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetPeerInternalDataAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -262,23 +255,35 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(unsetPeerInternalDataRequest.PeerId, out var peer))
                 {
-                    throw new Exception($"UnsetPeerInternalDataAsync() | Peer:{unsetPeerInternalDataRequest.PeerId} is not exists.");
+                    throw new PeerNotExistsException("UnsetPeerInternalDataAsync()", unsetPeerInternalDataRequest.PeerId);
                 }
 
                 return await peer.UnsetPeerInternalDataAsync(unsetPeerInternalDataRequest);
             }
         }
 
-        public async Task<PeerInternalDataResult> ClearPeerInternalDataAsync(string targetPeerId)
+        public async Task<PeerInternalDataResult> ClearPeerInternalDataAsync(string peerId, string connectionId, string targetPeerId)
         {
             using (await _peersLock.ReadLockAsync())
             {
-                if (!_peers.TryGetValue(targetPeerId, out var peer))
+                if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"ClearPeerInternalDataAsync() | Peer:{targetPeerId} is not exists.");
+                    throw new PeerNotExistsException("ClearPeerInternalDataAsync()", peerId);
                 }
 
-                return await peer.ClearPeerInternalDataAsync();
+                CheckConnection(peer, connectionId);
+
+                Peer targetPeer;
+                if(peerId == targetPeerId)
+                {
+                    targetPeer = peer;
+                }
+                else if (!_peers.TryGetValue(targetPeerId, out targetPeer))
+                {
+                    throw new PeerNotExistsException("ClearPeerInternalDataAsync()", targetPeerId);
+                }
+
+                return await targetPeer.ClearPeerInternalDataAsync();
             }
         }
 
@@ -288,7 +293,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"CreateWebRtcTransport() | Peer:{peerId} is not exists");
+                    throw new PeerNotExistsException("CreateWebRtcTransport()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -303,7 +308,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"ConnectWebRtcTransportAsync() | Peer:{peerId} is not exists");
+                    throw new PeerNotExistsException("ConnectWebRtcTransportAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -318,7 +323,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"CreateWebRtcTransport() | Peer:{peerId} is not exists");
+                    throw new PeerNotExistsException("CreateWebRtcTransport()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -333,14 +338,14 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"Pull() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("PullAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
 
                 if (!_peers.TryGetValue(pullRequest.ProducerPeerId, out var producePeer))
                 {
-                    throw new Exception($"Pull() | Peer:{pullRequest.ProducerPeerId} is not exists.");
+                    throw new PeerNotExistsException("PullAsync()", pullRequest.ProducerPeerId);
                 }
 
                 var pullResult = await peer.PullAsync(producePeer, pullRequest.Sources);
@@ -361,7 +366,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"ProduceAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("ProduceAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -400,11 +405,11 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(producerPeerId, out var producerPeer))
                 {
-                    throw new Exception($"ConsumeAsync() | Producer Peer:{producerPeerId} is not exists.");
+                    throw new PeerNotExistsException("ConsumeAsync()", producerPeerId);
                 }
                 if (!_peers.TryGetValue(cosumerPeerId, out var cosumerPeer))
                 {
-                    throw new Exception($"ConsumeAsync() | Consumer Peer:{cosumerPeerId} is not exists.");
+                    throw new PeerNotExistsException("ConsumeAsync()", cosumerPeerId);
                 }
 
                 // NOTE: 这里假设了 Room 存在
@@ -424,7 +429,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"CloseProducerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("CloseProducerAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -439,7 +444,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"CloseProducerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("CloseAllProducersAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -448,13 +453,25 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<bool> CloseProducerWithSourcesAsync(string peerId, IEnumerable<string> sources)
+        public async Task<bool> CloseProducerWithSourcesAsync(string peerId, string connectionId, string targetPeerId, IEnumerable<string> sources)
         {
             using (await _peersLock.ReadLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"CloseProducerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("CloseProducerWithSourcesAsync()", peerId);
+                }
+
+                CheckConnection(peer, connectionId);
+
+                Peer targetPeer;
+                if (peerId == targetPeerId)
+                {
+                    targetPeer = peer;
+                }
+                else if (!_peers.TryGetValue(targetPeerId, out targetPeer))
+                {
+                    throw new PeerNotExistsException("CloseProducerWithSourcesAsync()", targetPeerId);
                 }
 
                 return await peer.CloseProducerWithSourcesAsync(sources);
@@ -467,7 +484,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"PauseProducerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("PauseProducerAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -482,7 +499,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"ResumeProducerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("ResumeProducerAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -497,7 +514,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"CloseConsumerAsync() | Peer:{ peerId} is not exists.");
+                    throw new PeerNotExistsException("CloseConsumerAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -512,7 +529,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"PauseConsumerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("PauseConsumerAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -527,7 +544,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"ResumeConsumerAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("ResumeConsumerAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -542,7 +559,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"SetConsumerPreferedLayersAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("SetConsumerPreferedLayersAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -557,7 +574,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"SetConsumerPriorityAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("SetConsumerPriorityAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -572,7 +589,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"RequestConsumerKeyFrameAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("RequestConsumerKeyFrameAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -587,7 +604,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetWebRtcTransportStatsAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetWebRtcTransportStatsAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -602,7 +619,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetProducerStatsAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetProducerStatsAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -626,13 +643,13 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<IceParameters?> RestartIceAsync(string peerId, string connectionId, string transportId)
+        public async Task<IceParameters> RestartIceAsync(string peerId, string connectionId, string transportId)
         {
             using (await _peersLock.ReadLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"RestartIceAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("RestartIceAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -647,7 +664,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetOtherPeerIdsAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetOtherPeerIdsAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -662,7 +679,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetOtherPeersAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetOtherPeersAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);
@@ -677,7 +694,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetPeerRoleAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetPeerRoleAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);

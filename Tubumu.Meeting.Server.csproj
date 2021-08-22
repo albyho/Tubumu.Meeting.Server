@@ -39,5 +39,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="SignalRSwaggerGen" />
+    <None Remove="Exceptions\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Exceptions\" />
   </ItemGroup>
 </Project>
