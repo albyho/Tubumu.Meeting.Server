@@ -6,6 +6,7 @@ namespace Tubumu.Meeting.Server
     {
         public MeetingException(string message) : base(message)
         {
+
         }
     }
 }

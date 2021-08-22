@@ -14,6 +14,24 @@ namespace Tubumu.Meeting.Server
 
         public string Message { get; set; } = "Success";
 
+        public static MeetingMessage Failure(string? message = null)
+        {
+            return new MeetingMessage
+            {
+                Code = 400,
+                Message = message ?? "Failure"
+            };
+        }
+
+        public static MeetingMessage Success(string? message = null)
+        {
+            return new MeetingMessage
+            {
+                Code = 200,
+                Message = message ?? "Success"
+            };
+        }
+
         public static string Stringify(int code, string message, string? data = null)
         {
             if (data == null)
@@ -31,5 +49,24 @@ namespace Tubumu.Meeting.Server
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public T Data { get; set; }
+
+        public static MeetingMessage<T> Success(T data, string? message = null)
+        {
+            return new MeetingMessage<T>
+            {
+                Code = 200,
+                Message = message ?? "Success",
+                Data = data
+            };
+        }
+
+        public static new MeetingMessage<T> Failure(string? message = null)
+        {
+            return new MeetingMessage<T>
+            {
+                Code = 200,
+                Message = message ?? "Success",
+            };
+        }
     }
 }

@@ -88,7 +88,7 @@ namespace Tubumu.Meeting.Server
         public MeetingMessage<RtpCapabilities> GetRouterRtpCapabilities()
         {
             var rtpCapabilities = _scheduler.DefaultRtpCapabilities;
-            return new MeetingMessage<RtpCapabilities> { Code = 200, Message = "GetRouterRtpCapabilities 成功", Data = rtpCapabilities };
+            return  MeetingMessage<RtpCapabilities>.Success(rtpCapabilities, "GetRouterRtpCapabilities 成功");
         }
 
         /// <summary>
@@ -101,23 +101,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.JoinAsync(UserId, ConnectionId, joinRequest))
+                if (await _scheduler.JoinAsync(UserId, ConnectionId, joinRequest))
                 {
-                    return new MeetingMessage { Code = 400, Message = "Join 失败" };
+                    return MeetingMessage.Success("Join 成功");
                 }
             }
             catch(MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = "Join 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Join 调用失败.");
-                return new MeetingMessage { Code = 400, Message = "Join 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "Join 成功" };
+            return MeetingMessage.Failure("Join 失败");
         }
 
         /// <summary>
@@ -134,7 +132,7 @@ namespace Tubumu.Meeting.Server
                 var joinRoomResult = await _scheduler.JoinRoomAsync(UserId, ConnectionId, joinRoomRequest);
                 if (joinRoomResult == null)
                 {
-                    return new MeetingMessage<JoinRoomResponse> { Code = 400, Message = "JoinRoom 失败" };
+                    return MeetingMessage<JoinRoomResponse>.Failure("JoinRoom 失败");
                 }
 
                 // 将自身的信息告知给房间内的其他人
@@ -150,18 +148,18 @@ namespace Tubumu.Meeting.Server
                 {
                     Peers = joinRoomResult.Peers,
                 };
-                return new MeetingMessage<JoinRoomResponse> { Code = 200, Message = "JoinRoom 成功", Data = data };
+                return MeetingMessage<JoinRoomResponse>.Success(data, "JoinRoom 成功");
             }
             catch(MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage<JoinRoomResponse> { Code = 400, Message = "JoinRoom 失败" };
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "JoinRoom 调用失败.");
-                return new MeetingMessage<JoinRoomResponse> { Code = 400, Message = "JoinRoom 失败" };
             }
+
+            return MeetingMessage<JoinRoomResponse>.Failure("JoinRoom 失败");
         }
 
         /// <summary>
@@ -182,18 +180,18 @@ namespace Tubumu.Meeting.Server
                     PeerId = UserId
                 });
 
-                return new MeetingMessage { Code = 200, Message = "LeaveRoom 成功" };
+                return MeetingMessage.Success("LeaveRoom 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = "LeaveRoom 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "LeaveRoom 调用失败.");
-                return new MeetingMessage<JoinRoomResponse> { Code = 400, Message = "LeaveRoom 失败" };
             }
+
+            return MeetingMessage.Failure("LeaveRoom 失败");
         }
 
         #endregion
@@ -229,59 +227,68 @@ namespace Tubumu.Meeting.Server
         /// <returns></returns>
         private async Task<MeetingMessage<CreateWebRtcTransportResult>> CreateWebRtcTransportAsync([SignalRArg] CreateWebRtcTransportRequest createWebRtcTransportRequest, bool isSend)
         {
-            var transport = await _scheduler.CreateWebRtcTransportAsync(UserId, ConnectionId, createWebRtcTransportRequest, isSend);
-            transport.On("sctpstatechange", sctpState =>
+            try
             {
-                _logger.LogDebug($"WebRtcTransport \"sctpstatechange\" event [sctpState:{sctpState}]");
-                return Task.CompletedTask;
-            });
-
-            transport.On("dtlsstatechange", value =>
-            {
-                var dtlsState = (DtlsState)value!;
-                if (dtlsState == DtlsState.Failed || dtlsState == DtlsState.Closed)
+                var transport = await _scheduler.CreateWebRtcTransportAsync(UserId, ConnectionId, createWebRtcTransportRequest, isSend);
+                transport.On("sctpstatechange", sctpState =>
                 {
-                    _logger.LogWarning($"WebRtcTransport dtlsstatechange event [dtlsState:{value}]");
-                }
-                return Task.CompletedTask;
-            });
+                    _logger.LogDebug($"WebRtcTransport \"sctpstatechange\" event [sctpState:{sctpState}]");
+                    return Task.CompletedTask;
+                });
 
-            // NOTE: For testing.
-            //await transport.EnableTraceEventAsync(new[] { TransportTraceEventType.Probation, TransportTraceEventType.BWE });
-            //await transport.EnableTraceEventAsync(new[] { TransportTraceEventType.BWE });
-
-            var peerId = UserId;
-            transport.On("trace", trace =>
-            {
-                var traceData = (TransportTraceEventData)trace!;
-                _logger.LogDebug($"transport \"trace\" event [transportId:{transport.TransportId}, trace:{traceData.Type.GetEnumMemberValue()}]");
-
-                if (traceData.Type == TransportTraceEventType.BWE && traceData.Direction == TraceEventDirection.Out)
+                transport.On("dtlsstatechange", value =>
                 {
+                    var dtlsState = (DtlsState)value!;
+                    if (dtlsState == DtlsState.Failed || dtlsState == DtlsState.Closed)
+                    {
+                        _logger.LogWarning($"WebRtcTransport dtlsstatechange event [dtlsState:{value}]");
+                    }
+                    return Task.CompletedTask;
+                });
+
+                // NOTE: For testing.
+                //await transport.EnableTraceEventAsync(new[] { TransportTraceEventType.Probation, TransportTraceEventType.BWE });
+                //await transport.EnableTraceEventAsync(new[] { TransportTraceEventType.BWE });
+
+                var peerId = UserId;
+                transport.On("trace", trace =>
+                {
+                    var traceData = (TransportTraceEventData)trace!;
+                    _logger.LogDebug($"transport \"trace\" event [transportId:{transport.TransportId}, trace:{traceData.Type.GetEnumMemberValue()}]");
+
+                    if (traceData.Type == TransportTraceEventType.BWE && traceData.Direction == TraceEventDirection.Out)
+                    {
                     // Notification: downlinkBwe
                     SendNotification(peerId, "downlinkBwe", new
-                    {
-                        DesiredBitrate = traceData.Info["desiredBitrate"],
-                        EffectiveDesiredBitrate = traceData.Info["effectiveDesiredBitrate"],
-                        AvailableBitrate = traceData.Info["availableBitrate"]
-                    });
-                }
-                return Task.CompletedTask;
-            });
+                        {
+                            DesiredBitrate = traceData.Info["desiredBitrate"],
+                            EffectiveDesiredBitrate = traceData.Info["effectiveDesiredBitrate"],
+                            AvailableBitrate = traceData.Info["availableBitrate"]
+                        });
+                    }
+                    return Task.CompletedTask;
+                });
 
-            return new MeetingMessage<CreateWebRtcTransportResult>
-            {
-                Code = 200,
-                Message = $"CreateWebRtcTransport 成功({(isSend ? "Producing" : "Consuming")})",
-                Data = new CreateWebRtcTransportResult
+                return MeetingMessage<CreateWebRtcTransportResult>.Success(new CreateWebRtcTransportResult
                 {
                     TransportId = transport.TransportId,
                     IceParameters = transport.IceParameters,
                     IceCandidates = transport.IceCandidates,
                     DtlsParameters = transport.DtlsParameters,
                     SctpParameters = transport.SctpParameters,
-                }
-            };
+                },
+                "CreateWebRtcTransport 成功");
+            }
+            catch (MeetingException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CreateWebRtcTransportAsync 调用失败.");
+            }
+
+            return MeetingMessage<CreateWebRtcTransportResult>.Failure("CreateWebRtcTransportAsync 失败");
         }
 
         /// <summary>
@@ -294,22 +301,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.ConnectWebRtcTransportAsync(UserId, ConnectionId, connectWebRtcTransportRequest))
+                if (await _scheduler.ConnectWebRtcTransportAsync(UserId, ConnectionId, connectWebRtcTransportRequest))
                 {
-                    return new MeetingMessage { Code = 400, Message = $"ConnectWebRtcTransport 失败: TransportId: {connectWebRtcTransportRequest.TransportId}" };
+                    return MeetingMessage.Success("ConnectWebRtcTransport 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"ConnectWebRtcTransport 失败: TransportId: {connectWebRtcTransportRequest.TransportId}, {ex.Message}" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ConnectWebRtcTransport 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"ConnectWebRtcTransport 失败: TransportId: {connectWebRtcTransportRequest.TransportId}, {ex.Message}" };
             }
-            return new MeetingMessage { Code = 200, Message = "ConnectWebRtcTransport 成功" };
+
+            return MeetingMessage.Failure($"ConnectWebRtcTransport 失败: TransportId: {connectWebRtcTransportRequest.TransportId}");
         }
 
         [SignalRMethod(name: "Ready", operationType: OperationType.Post)]
@@ -329,20 +335,21 @@ namespace Tubumu.Meeting.Server
                             CreateConsumer(UserId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
                         }
                     }
+
+                    return MeetingMessage.Success("Ready 成功");
                 }
                 catch (MeetingException ex)
                 {
                     _logger.LogError(ex.Message);
-                    return new MeetingMessage { Code = 400, Message = $"Ready 失败" };
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Ready 调用失败.");
-                    return new MeetingMessage { Code = 400, Message = $"Ready 失败" };
                 }
+
             }
 
-            return new MeetingMessage { Code = 200, Message = "Ready 成功" };
+            return MeetingMessage.Failure("Ready 失败");
         }
 
         #endregion
@@ -382,19 +389,19 @@ namespace Tubumu.Meeting.Server
                         ProduceSources = consumeResult.ProduceSources
                     });
                 }
+
+                return MeetingMessage.Success("Pull 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"Pull 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Pull 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"Pull 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "Pull 成功" };
+            return MeetingMessage.Failure("Pull 失败");
         }
 
         #endregion
@@ -419,22 +426,18 @@ namespace Tubumu.Meeting.Server
                 // 仅会议室管理员可以邀请。
                 if (await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
                 {
-                    return new MeetingMessage { Code = 400, Message = "仅管理员可发起邀请。" };
+                    return MeetingMessage.Failure("仅管理员可发起邀请。");
                 }
 
                 // 管理员无需邀请自己。
                 if (inviteRequest.PeerId == UserId)
                 {
-                    return new MeetingMessage { Code = 400, Message = "管理员请勿邀请自己。" };
+                    return MeetingMessage.Failure("管理员请勿邀请自己。");
                 }
 
                 if (inviteRequest.Sources.IsNullOrEmpty() || inviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
                 {
-                    return new MeetingMessage<ProduceRespose>
-                    {
-                        Code = 400,
-                        Message = $"Invite 失败: Sources 参数缺失或非法。",
-                    };
+                    return MeetingMessage.Failure("Sources 参数缺失或非法。");
                 }
 
                 // NOTE: 暂未校验被邀请方是否有对应的 Source 。不过就算接收邀请也无法生产。
@@ -456,19 +459,19 @@ namespace Tubumu.Meeting.Server
                 {
                     ProduceSources = inviteRequest.Sources
                 });
+
+                return MeetingMessage.Success("Invite 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"Invite 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Invite 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"Invite 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "Invite 成功" };
+            return MeetingMessage.Failure("Invite 失败");
         }
 
         /// <summary>
@@ -486,26 +489,22 @@ namespace Tubumu.Meeting.Server
 
             try
             {
-
                 // 仅会议室管理员可以取消邀请。
                 if (await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
                 {
-                    return new MeetingMessage { Code = 400, Message = "仅管理员可取消邀请。" };
+                    return MeetingMessage.Failure("仅管理员可取消邀请。");
                 }
 
                 // 管理员无需取消邀请自己。
                 if (deinviteRequest.PeerId == UserId)
                 {
-                    return new MeetingMessage { Code = 400, Message = "管理员请勿取消邀请自己。" };
+                    return MeetingMessage.Failure("管理员请勿取消邀请自己。");
                 }
 
                 if (deinviteRequest.Sources.IsNullOrEmpty() || deinviteRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
                 {
-                    return new MeetingMessage<ProduceRespose>
-                    {
-                        Code = 400,
-                        Message = $"Deinvite 失败: Sources 参数缺失或非法。",
-                    };
+
+                    return MeetingMessage.Failure("Sources 参数缺失或非法。");
                 }
 
                 // NOTE: 暂未校验被邀请方是否有对应的 Source 。也未校验对应 Source 是否收到邀请。
@@ -530,19 +529,19 @@ namespace Tubumu.Meeting.Server
                 {
                     CloseSources = deinviteRequest.Sources
                 });
+
+                return MeetingMessage.Success("Deinvite 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"Deinvite 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Deinvite 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"Deinvite 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "Deinvite 成功" };
+            return MeetingMessage.Failure("Deinvite 失败");
         }
 
         /// <summary>
@@ -561,18 +560,14 @@ namespace Tubumu.Meeting.Server
             // 管理员无需发出申请。
             if (await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) == UserRole.Admin)
             {
-                return new MeetingMessage { Code = 400, Message = "管理员无需发出申请。" };
+                return MeetingMessage.Failure("管理员无需发出申请。");
             }
 
             try
             {
                 if (requestProduceRequest.Sources.IsNullOrEmpty() || requestProduceRequest.Sources.Any(m => m.IsNullOrWhiteSpace()))
                 {
-                    return new MeetingMessage<ProduceRespose>
-                    {
-                        Code = 400,
-                        Message = $"RequestProduce 失败: Sources 参数缺失或非法。",
-                    };
+                    return MeetingMessage.Failure("RequestProduce 失败: Sources 参数缺失或非法。");
                 }
 
                 // NOTE: 暂未校验被邀请方是否有对应的 Source 。不过就算接收邀请也无法生产。
@@ -585,19 +580,19 @@ namespace Tubumu.Meeting.Server
                     PeerId = UserId,
                     ProduceSources = requestProduceRequest.Sources
                 });
+
+                return MeetingMessage.Success("RequestProduce 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"RequestProduce 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "RequestProduce 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"RequestProduce 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "RequestProduce 成功" };
+            return MeetingMessage.Failure("RequestProduce 失败");
         }
 
         #endregion
@@ -621,41 +616,24 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var peerId = UserId;
-                ProduceResult produceResult;
-                try
+                // 在 Invate 模式下如果不是管理员需校验 Source 是否被邀请。
+                if (_meetingServerOptions.ServeMode == ServeMode.Invite && await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
                 {
-                    // 在 Invate 模式下如果不是管理员需校验 Source 是否被邀请。
-                    if (_meetingServerOptions.ServeMode == ServeMode.Invite && await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
+                    var internalData = await _scheduler.GetPeerInternalDataAsync(UserId, ConnectionId);
+                    var inviteKey = $"Invate:{produceRequest.Source}";
+                    if (!internalData.InternalData.TryGetValue(inviteKey, out var inviteValue))
                     {
-                        var internalData = await _scheduler.GetPeerInternalDataAsync(UserId, ConnectionId);
-                        var inviteKey = $"Invate:{produceRequest.Source}";
-                        if (!internalData.InternalData.TryGetValue(inviteKey, out var inviteValue))
-                        {
-                            return new MeetingMessage<ProduceRespose>
-                            {
-                                Code = 400,
-                                Message = $"Produce 失败:未受邀请的生产。",
-                            };
-                        }
-
-                        // 清除邀请状态
-                        await _scheduler.UnsetPeerInternalDataAsync(new UnsetPeerInternalDataRequest
-                        {
-                            PeerId = UserId,
-                            Keys = new[] { inviteKey }
-                        });
+                        return MeetingMessage<ProduceRespose>.Failure("未受邀请的生产。");
                     }
-                    produceResult = await _scheduler.ProduceAsync(peerId, ConnectionId, produceRequest);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Produce()");
-                    return new MeetingMessage<ProduceRespose>
+
+                    // 清除邀请状态
+                    await _scheduler.UnsetPeerInternalDataAsync(new UnsetPeerInternalDataRequest
                     {
-                        Code = 400,
-                        Message = $"Produce 失败:{ex.Message}",
-                    };
+                        PeerId = UserId,
+                        Keys = new[] { inviteKey }
+                    });
                 }
+                var produceResult = await _scheduler.ProduceAsync(peerId, ConnectionId, produceRequest);
 
                 var producerPeer = produceResult.ProducerPeer;
                 var producer = produceResult.Producer;
@@ -675,70 +653,66 @@ namespace Tubumu.Meeting.Server
                 producer.On("score", score =>
                 {
                     var data = (ProducerScore[])score!;
-                // Notification: producerScore
-                SendNotification(peerId, "producerScore", new { ProducerId = producer.ProducerId, Score = data });
+                    // Notification: producerScore
+                    SendNotification(peerId, "producerScore", new { ProducerId = producer.ProducerId, Score = data });
                     return Task.CompletedTask;
                 });
                 producer.On("videoorientationchange", videoOrientation =>
                 {
-                // Notification: videoorientationchange
-                var data = (ProducerVideoOrientation)videoOrientation!;
+                    // Notification: videoorientationchange
+                    var data = (ProducerVideoOrientation)videoOrientation!;
                     _logger.LogDebug($"producer.On() | Producer \"videoorientationchange\" Event [producerId:\"{producer.ProducerId}\", VideoOrientation:\"{videoOrientation}\"]");
                     return Task.CompletedTask;
                 });
                 producer.Observer.On("close", _ =>
                 {
-                // Notification: producerClosed
-                SendNotification(peerId, "producerClosed", new { ProducerId = producer.ProducerId });
+                    // Notification: producerClosed
+                    SendNotification(peerId, "producerClosed", new { ProducerId = producer.ProducerId });
                     return Task.CompletedTask;
                 });
 
-                return new MeetingMessage<ProduceRespose>
-                {
-                    Code = 200,
-                    Message = "Produce 成功",
-                    Data = new ProduceRespose { Id = producer.ProducerId, Source = produceRequest.Source }
-                };
+                return MeetingMessage<ProduceRespose>.Success(new ProduceRespose {
+                    Id = producer.ProducerId,
+                    Source = produceRequest.Source },
+                    "Produce 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage<ProduceRespose> { Code = 400, Message = $"Produce 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Produce 调用失败.");
-                return new MeetingMessage<ProduceRespose> { Code = 400, Message = $"Produce 失败" };
             }
+
+            return MeetingMessage<ProduceRespose>.Failure("Produce 失败");
         }
 
-        /// <summary>
-        /// Close producer.
-        /// </summary>
-        /// <param name="producerId"></param>
-        /// <returns></returns>
-        [SignalRMethod(name: "CloseProducer", operationType: OperationType.Post)]
+            /// <summary>
+            /// Close producer.
+            /// </summary>
+            /// <param name="producerId"></param>
+            /// <returns></returns>
+            [SignalRMethod(name: "CloseProducer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> CloseProducer([SignalRArg] string producerId)
         {
             try
             {
-                if (!await _scheduler.CloseProducerAsync(UserId, ConnectionId, producerId))
+                if (await _scheduler.CloseProducerAsync(UserId, ConnectionId, producerId))
                 {
-                    return new MeetingMessage { Code = 400, Message = "CloseProducer 失败" };
+                    return MeetingMessage.Success("CloseProducer 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"CloseProducer 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "CloseProducer 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"CloseProducer 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "CloseProducer 成功" };
+            return MeetingMessage.Failure("CloseProducer 失败");
         }
 
         /// <summary>
@@ -751,23 +725,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.PauseProducerAsync(UserId, ConnectionId, producerId))
+                if (await _scheduler.PauseProducerAsync(UserId, ConnectionId, producerId))
                 {
-                    return new MeetingMessage { Code = 400, Message = "CloseProducer 失败" };
+                    return MeetingMessage.Success("PauseProducer 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"PauseProducer 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "PauseProducer 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"PauseProducer 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "PauseProducer 成功" };
+            return MeetingMessage.Failure("CloseProducer 失败");
         }
 
         /// <summary>
@@ -780,23 +752,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.ResumeProducerAsync(UserId, ConnectionId, producerId))
+                if (await _scheduler.ResumeProducerAsync(UserId, ConnectionId, producerId))
                 {
-                    return new MeetingMessage { Code = 400, Message = "CloseProducer 失败" };
+                    return MeetingMessage.Success("ResumeProducer 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"ResumeProducer 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ResumeProducer 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"ResumeProducer 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "ResumeProducer 成功" };
+            return MeetingMessage.Failure("CloseProducer 失败");
         }
 
         #endregion
@@ -813,23 +783,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.CloseConsumerAsync(UserId, ConnectionId, consumerId))
+                if (await _scheduler.CloseConsumerAsync(UserId, ConnectionId, consumerId))
                 {
-                    return new MeetingMessage { Code = 400, Message = "CloseConsumer 失败" };
+                    return MeetingMessage.Success("CloseConsumer 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"CloseConsumer 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "CloseConsumer 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"CloseConsumer 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "CloseConsumer 成功" };
+            return MeetingMessage.Failure("CloseConsumer 失败");
         }
 
         /// <summary>
@@ -842,23 +810,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.PauseConsumerAsync(UserId, ConnectionId, consumerId))
+                if (await _scheduler.PauseConsumerAsync(UserId, ConnectionId, consumerId))
                 {
-                    return new MeetingMessage { Code = 400, Message = "PauseConsumer 失败" };
+                    return MeetingMessage.Success("PauseConsumer 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"PauseConsumer 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "PauseConsumer 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"PauseConsumer 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "PauseConsumer 成功" };
+            return MeetingMessage.Failure("PauseConsumer 失败");
         }
 
         /// <summary>
@@ -872,26 +838,24 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var consumer = await _scheduler.ResumeConsumerAsync(UserId, ConnectionId, consumerId);
-                if (consumer == null)
+                if (consumer != null)
                 {
-                    return new MeetingMessage { Code = 400, Message = "ResumeConsumer 失败" };
+                    // Notification: consumerScore
+                    SendNotification(UserId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = consumer.Score });
                 }
 
-                // Notification: consumerScore
-                SendNotification(UserId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = consumer.Score });
+                return MeetingMessage.Success("ResumeConsumer 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"ResumeConsumer 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ResumeConsumer 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"ResumeConsumer 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "ResumeConsumer 成功" };
+            return MeetingMessage.Failure("ResumeConsumer 失败");
         }
 
         /// <summary>
@@ -904,23 +868,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.SetConsumerPreferedLayersAsync(UserId, ConnectionId, setConsumerPreferedLayersRequest))
+                if (await _scheduler.SetConsumerPreferedLayersAsync(UserId, ConnectionId, setConsumerPreferedLayersRequest))
                 {
-                    return new MeetingMessage { Code = 400, Message = "SetConsumerPreferedLayers 失败" };
+                    return MeetingMessage.Success("SetConsumerPreferedLayers 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"SetConsumerPreferedLayers 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "SetConsumerPreferedLayers 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"SetConsumerPreferedLayers 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "SetConsumerPreferedLayers 成功" };
+            return MeetingMessage.Failure("SetConsumerPreferedLayers 失败");
         }
 
         /// <summary>
@@ -933,23 +895,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.SetConsumerPriorityAsync(UserId, ConnectionId, setConsumerPriorityRequest))
+                if (await _scheduler.SetConsumerPriorityAsync(UserId, ConnectionId, setConsumerPriorityRequest))
                 {
-                    return new MeetingMessage { Code = 400, Message = "SetConsumerPreferedLayers 失败" };
+                    return MeetingMessage.Success("SetConsumerPriority 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"SetConsumerPriority 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "SetConsumerPriority 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"SetConsumerPriority 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "SetConsumerPriority 成功" };
+            return MeetingMessage.Failure("SetConsumerPreferedLayers 失败");
         }
 
         /// <summary>
@@ -962,23 +922,21 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (!await _scheduler.RequestConsumerKeyFrameAsync(UserId, ConnectionId, consumerId))
+                if (await _scheduler.RequestConsumerKeyFrameAsync(UserId, ConnectionId, consumerId))
                 {
-                    return new MeetingMessage { Code = 400, Message = "RequestConsumerKeyFrame 失败" };
+                    return MeetingMessage.Success("RequestConsumerKeyFrame 成功");
                 }
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"RequestConsumerKeyFrame 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "RequestConsumerKeyFrame 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"RequestConsumerKeyFrame 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "RequestConsumerKeyFrame 成功" };
+            return MeetingMessage.Failure("RequestConsumerKeyFrame 失败");
         }
 
         #endregion
@@ -996,18 +954,18 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var data = await _scheduler.GetWebRtcTransportStatsAsync(UserId, ConnectionId, transportId);
-                return new MeetingMessage<TransportStat> { Code = 200, Message = "GetWebRtcTransportStats 成功", Data = data };
+                return MeetingMessage<TransportStat>.Success(data, "GetWebRtcTransportStats 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage<TransportStat> { Code = 400, Message = $"GetWebRtcTransportStats 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetWebRtcTransportStats 调用失败.");
-                return new MeetingMessage<TransportStat> { Code = 400, Message = $"GetWebRtcTransportStats 失败" };
             }
+
+            return MeetingMessage<TransportStat>.Failure("GetWebRtcTransportStats 失败");
         }
 
         /// <summary>
@@ -1021,18 +979,18 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var data = await _scheduler.GetProducerStatsAsync(UserId, ConnectionId, producerId);
-                return new MeetingMessage<ProducerStat> { Code = 200, Message = "GetProducerStats 成功", Data = data };
+                return MeetingMessage<ProducerStat>.Success(data, "GetProducerStats 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage<ProducerStat> { Code = 400, Message = $"GetProducerStats 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetProducerStats 调用失败.");
-                return new MeetingMessage<ProducerStat> { Code = 400, Message = $"GetProducerStats 失败" };
             }
+
+            return MeetingMessage<ProducerStat>.Failure("GetProducerStats 失败");
         }
 
         /// <summary>
@@ -1046,18 +1004,18 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var data = await _scheduler.GetConsumerStatsAsync(UserId, ConnectionId, consumerId);
-                return new MeetingMessage<ConsumerStat> { Code = 200, Message = "GetConsumerStats 成功", Data = data };
+                return MeetingMessage<ConsumerStat>.Success(data, "GetConsumerStats 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage<ConsumerStat> { Code = 400, Message = $"GetConsumerStats 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetConsumerStats 调用失败.");
-                return new MeetingMessage<ConsumerStat> { Code = 400, Message = $"GetConsumerStats 失败" };
             }
+
+            return MeetingMessage<ConsumerStat>.Failure("GetConsumerStats 失败");
         }
 
         /// <summary>
@@ -1071,18 +1029,18 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var iceParameters = await _scheduler.RestartIceAsync(UserId, ConnectionId, transportId);
-                return new MeetingMessage<IceParameters> { Code = 200, Message = "RestartIce 成功", Data = iceParameters };
+                return MeetingMessage<IceParameters>.Success(iceParameters, "RestartIce 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage<IceParameters> { Code = 400, Message = $"RestartIce 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "GetConsumerStats 调用失败.");
-                return new MeetingMessage<IceParameters> { Code = 400, Message = $"RestartIce 失败" };
             }
+
+            return MeetingMessage<IceParameters>.Failure("RestartIce 失败");
         }
 
         #endregion
@@ -1107,19 +1065,19 @@ namespace Tubumu.Meeting.Server
                     RoomId = sendMessageRequest.RoomId,
                     Message = sendMessageRequest.Message,
                 });
+
+                return MeetingMessage.Success("SendMessage 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"SendMessage 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "SendMessage 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"SendMessage 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "SendMessage 成功" };
+            return MeetingMessage.Failure("SendMessage 失败");
         }
 
         #endregion
@@ -1144,19 +1102,19 @@ namespace Tubumu.Meeting.Server
                     PeerId = UserId,
                     AppData = peerPeerAppDataResult.AppData,
                 });
+
+                return MeetingMessage.Success("SetRoomAppData 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"SetRoomAppData 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "SetRoomAppData 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"SetRoomAppData 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "SetRoomAppData 成功" };
+            return MeetingMessage.Failure("SetRoomAppData 失败");
         }
 
         /// <summary>
@@ -1177,19 +1135,19 @@ namespace Tubumu.Meeting.Server
                     PeerId = UserId,
                     AppData = peerPeerAppDataResult.AppData,
                 });
+
+                return MeetingMessage.Success("UnsetPeerAppData 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"UnsetPeerAppData 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "UnsetPeerAppData 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"UnsetPeerAppData 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "UnsetPeerAppData 成功" };
+            return MeetingMessage.Failure("UnsetPeerAppData 失败");
         }
 
         /// <summary>
@@ -1209,19 +1167,19 @@ namespace Tubumu.Meeting.Server
                     PeerId = UserId,
                     AppData = peerPeerAppDataResult.AppData,
                 });
+
+                return MeetingMessage.Success("ClearPeerAppData 成功");
             }
             catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
-                return new MeetingMessage { Code = 400, Message = $"ClearPeerAppData 失败" };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ClearPeerAppData 调用失败.");
-                return new MeetingMessage { Code = 400, Message = $"ClearPeerAppData 失败" };
             }
 
-            return new MeetingMessage { Code = 200, Message = "ClearPeerAppData 成功" };
+            return MeetingMessage.Failure("ClearPeerAppData 失败");
         }
 
         #endregion
