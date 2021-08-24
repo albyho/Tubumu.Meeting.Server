@@ -87,13 +87,13 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<LeaveResult> LeaveAsync(string peerId)
+        public async Task<LeaveResult?> LeaveAsync(string peerId)
         {
             using (await _peersLock.WriteLockAsync())
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new PeerNotExistsException("LeaveAsync()", peerId);
+                    return null;
                 }
 
                 _peers.Remove(peerId);
@@ -355,7 +355,7 @@ namespace Tubumu.Meeting.Server
                     ConsumePeer = peer,
                     ProducePeer = producePeer,
                     ExistsProducers = pullResult.ExistsProducers,
-                    ProduceSources = pullResult.ProduceSources,
+                    Sources = pullResult.ProduceSources,
                 };
             }
         }
@@ -399,7 +399,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<Consumer> ConsumeAsync(string producerPeerId, string cosumerPeerId, string producerId)
+        public async Task<Consumer?> ConsumeAsync(string producerPeerId, string cosumerPeerId, string producerId)
         {
             using (await _peersLock.ReadLockAsync())
             {
@@ -413,13 +413,7 @@ namespace Tubumu.Meeting.Server
                 }
 
                 // NOTE: 这里假设了 Room 存在
-                var consumer = await cosumerPeer.ConsumeAsync(producerPeer, producerId);
-                if (consumer == null)
-                {
-                    throw new Exception($"ConsumeAsync() | Peer:{cosumerPeerId} consume faild.");
-                }
-
-                return consumer;
+                return await cosumerPeer.ConsumeAsync(producerPeer, producerId);
             }
         }
 

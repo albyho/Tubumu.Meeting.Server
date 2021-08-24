@@ -1,4 +1,5 @@
-﻿using Tubumu.Mediasoup;
+﻿using System.Collections.Generic;
+using Tubumu.Mediasoup;
 
 namespace Tubumu.Meeting.Server
 {
@@ -6,6 +7,6 @@ namespace Tubumu.Meeting.Server
     {
         public Producer[] ExistsProducers { get; set; }
 
-        public string[] ProduceSources { get; set; }
+        public HashSet<string> ProduceSources { get; set; }
     }
 }

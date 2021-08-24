@@ -64,7 +64,7 @@ namespace Tubumu.Meeting.Server
         {
             return new MeetingMessage<T>
             {
-                Code = 200,
+                Code = 400,
                 Message = message ?? "Success",
             };
         }

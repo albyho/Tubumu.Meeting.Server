@@ -59,17 +59,22 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var leaveResult = await _scheduler.LeaveAsync(UserId);
-                // Notification: peerLeaveRoom
-                SendNotification(leaveResult.OtherPeerIds, "peerLeaveRoom", new { PeerId = leaveResult.SelfPeer.PeerId });
-                _badDisconnectSocketService.DisconnectClient(leaveResult.SelfPeer.ConnectionId);
+                if(leaveResult != null)
+                {
+                    // Notification: peerLeaveRoom
+                    SendNotification(leaveResult.OtherPeerIds, "peerLeaveRoom", new PeerLeaveRoomNotification {
+                        PeerId = leaveResult.SelfPeer.PeerId
+                    });
+                    _badDisconnectSocketService.DisconnectClient(leaveResult.SelfPeer.ConnectionId);
+                }
             }
-            catch (MeetingException)
+            catch (MeetingException ex)
             {
-                // Ignore
+                _logger.LogError(ex.Message);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore
+                _logger.LogError(ex, "LeaveAsync 调用失败.");
             }
         }
 
@@ -138,7 +143,7 @@ namespace Tubumu.Meeting.Server
                 // 将自身的信息告知给房间内的其他人
                 var otherPeerIds = joinRoomResult.Peers.Select(m => m.PeerId).Where(m => m != joinRoomResult.SelfPeer.PeerId).ToArray();
                 // Notification: peerJoinRoom
-                SendNotification(otherPeerIds, "peerJoinRoom", new
+                SendNotification(otherPeerIds, "peerJoinRoom", new PeerJoinRoomNotification
                 {
                     Peer = joinRoomResult.SelfPeer
                 });
@@ -175,7 +180,7 @@ namespace Tubumu.Meeting.Server
                 var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
 
                 // Notification: peerLeaveRoom
-                SendNotification(leaveRoomResult.OtherPeerIds, "peerLeaveRoom", new
+                SendNotification(leaveRoomResult.OtherPeerIds, "peerLeaveRoom", new PeerLeaveRoomNotification
                 {
                     PeerId = UserId
                 });
@@ -258,13 +263,13 @@ namespace Tubumu.Meeting.Server
 
                     if (traceData.Type == TransportTraceEventType.BWE && traceData.Direction == TraceEventDirection.Out)
                     {
-                    // Notification: downlinkBwe
-                    SendNotification(peerId, "downlinkBwe", new
-                        {
-                            DesiredBitrate = traceData.Info["desiredBitrate"],
-                            EffectiveDesiredBitrate = traceData.Info["effectiveDesiredBitrate"],
-                            AvailableBitrate = traceData.Info["availableBitrate"]
-                        });
+                        // Notification: downlinkBwe
+                        SendNotification(peerId, "downlinkBwe", new
+                            {
+                                DesiredBitrate = traceData.Info["desiredBitrate"],
+                                EffectiveDesiredBitrate = traceData.Info["effectiveDesiredBitrate"],
+                                AvailableBitrate = traceData.Info["availableBitrate"]
+                            });
                     }
                     return Task.CompletedTask;
                 });
@@ -371,22 +376,22 @@ namespace Tubumu.Meeting.Server
 
             try
             {
-                var consumeResult = await _scheduler.PullAsync(UserId, ConnectionId, pullRequest);
-                var consumerPeer = consumeResult.ConsumePeer;
-                var producerPeer = consumeResult.ProducePeer;
+                var pullResult = await _scheduler.PullAsync(UserId, ConnectionId, pullRequest);
+                var consumerPeer = pullResult.ConsumePeer;
+                var producerPeer = pullResult.ProducePeer;
 
-                foreach (var producer in consumeResult.ExistsProducers)
+                foreach (var producer in pullResult.ExistsProducers)
                 {
                     // 本 Peer 消费其他 Peer
                     CreateConsumer(consumerPeer.PeerId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
                 }
 
-                if (!consumeResult.ProduceSources.IsNullOrEmpty())
+                if (!pullResult.Sources.IsNullOrEmpty())
                 {
                     // Notification: produceSources
-                    SendNotification(consumeResult.ConsumePeer.PeerId, "produceSources", new
+                    SendNotification(pullResult.ConsumePeer.PeerId, "produceSources", new ProduceSourcesNotification
                     {
-                        ProduceSources = consumeResult.ProduceSources
+                        Sources = pullResult.Sources
                     });
                 }
 
@@ -455,9 +460,9 @@ namespace Tubumu.Meeting.Server
                 await _scheduler.SetPeerInternalDataAsync(setPeerInternalDataRequest);
 
                 // Notification: produceSources
-                SendNotification(inviteRequest.PeerId, "produceSources", new
+                SendNotification(inviteRequest.PeerId, "produceSources", new ProduceSourcesNotification
                 {
-                    ProduceSources = inviteRequest.Sources
+                    Sources = inviteRequest.Sources
                 });
 
                 return MeetingMessage.Success("Invite 成功");
@@ -525,9 +530,9 @@ namespace Tubumu.Meeting.Server
                 await _scheduler.CloseProducerWithSourcesAsync(UserId, ConnectionId, deinviteRequest.PeerId, deinviteRequest.Sources);
 
                 // Notification: closeSources
-                SendNotification(deinviteRequest.PeerId, "closeSources", new
+                SendNotification(deinviteRequest.PeerId, "closeSources", new CloseSourcesNotification
                 {
-                    CloseSources = deinviteRequest.Sources
+                    Sources = deinviteRequest.Sources
                 });
 
                 return MeetingMessage.Success("Deinvite 成功");
@@ -575,10 +580,10 @@ namespace Tubumu.Meeting.Server
                 var adminIds = await _scheduler.GetOtherPeerIdsAsync(UserId, ConnectionId, UserRole.Admin);
 
                 // Notification: requestProduce
-                SendNotification(adminIds, "requestProduce", new
+                SendNotification(adminIds, "requestProduce", new RequestProduceNotification
                 {
                     PeerId = UserId,
-                    ProduceSources = requestProduceRequest.Sources
+                    Sources = requestProduceRequest.Sources
                 });
 
                 return MeetingMessage.Success("RequestProduce 成功");
@@ -654,20 +659,29 @@ namespace Tubumu.Meeting.Server
                 {
                     var data = (ProducerScore[])score!;
                     // Notification: producerScore
-                    SendNotification(peerId, "producerScore", new { ProducerId = producer.ProducerId, Score = data });
+                    SendNotification(peerId, "producerScore", new ProducerScoreNotification {
+                        ProducerId = producer.ProducerId, Score = data
+                    });
                     return Task.CompletedTask;
                 });
-                producer.On("videoorientationchange", videoOrientation =>
+                producer.On("videoorientationchange", data =>
                 {
+                    // For Testing
+                    //var videoOrientation= (ProducerVideoOrientation?)data;
+
                     // Notification: videoorientationchange
-                    var data = (ProducerVideoOrientation)videoOrientation!;
-                    _logger.LogDebug($"producer.On() | Producer \"videoorientationchange\" Event [producerId:\"{producer.ProducerId}\", VideoOrientation:\"{videoOrientation}\"]");
+                    SendNotification(peerId, "producerVideoOrientationChanged", new ProducerVideoOrientationChangedNotification {
+                        ProducerId = producer.ProducerId,
+                        VideoOrientation = data
+                    });
                     return Task.CompletedTask;
                 });
                 producer.Observer.On("close", _ =>
                 {
                     // Notification: producerClosed
-                    SendNotification(peerId, "producerClosed", new { ProducerId = producer.ProducerId });
+                    SendNotification(peerId, "producerClosed", new ProducerClosedNotification {
+                        ProducerId = producer.ProducerId
+                    });
                     return Task.CompletedTask;
                 });
 
@@ -688,12 +702,12 @@ namespace Tubumu.Meeting.Server
             return MeetingMessage<ProduceRespose>.Failure("Produce 失败");
         }
 
-            /// <summary>
-            /// Close producer.
-            /// </summary>
-            /// <param name="producerId"></param>
-            /// <returns></returns>
-            [SignalRMethod(name: "CloseProducer", operationType: OperationType.Post)]
+        /// <summary>
+        /// Close producer.
+        /// </summary>
+        /// <param name="producerId"></param>
+        /// <returns></returns>
+        [SignalRMethod(name: "CloseProducer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> CloseProducer([SignalRArg] string producerId)
         {
             try
@@ -841,7 +855,10 @@ namespace Tubumu.Meeting.Server
                 if (consumer != null)
                 {
                     // Notification: consumerScore
-                    SendNotification(UserId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = consumer.Score });
+                    SendNotification(UserId, "consumerScore", new ConsumerScoreNotification {
+                        ConsumerId = consumer.ConsumerId,
+                        Score = consumer.Score
+                    });
                 }
 
                 return MeetingMessage.Success("ResumeConsumer 成功");
@@ -1060,9 +1077,8 @@ namespace Tubumu.Meeting.Server
                 var otherPeerIds = await _scheduler.GetOtherPeerIdsAsync(UserId, ConnectionId);
 
                 // Notification: newMessage
-                SendNotification(otherPeerIds, "newMessage", new
+                SendNotification(otherPeerIds, "newMessage", new NewMessageNotification
                 {
-                    RoomId = sendMessageRequest.RoomId,
                     Message = sendMessageRequest.Message,
                 });
 
@@ -1097,13 +1113,13 @@ namespace Tubumu.Meeting.Server
                 var peerPeerAppDataResult = await _scheduler.SetPeerAppDataAsync(UserId, ConnectionId, setPeerAppDataRequest);
 
                 // Notification: peerAppDataChanged
-                SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
+                SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new PeerAppDataChangedNotification
                 {
                     PeerId = UserId,
                     AppData = peerPeerAppDataResult.AppData,
                 });
 
-                return MeetingMessage.Success("SetRoomAppData 成功");
+                return MeetingMessage.Success("SetPeerAppData 成功");
             }
             catch (MeetingException ex)
             {
@@ -1111,10 +1127,10 @@ namespace Tubumu.Meeting.Server
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "SetRoomAppData 调用失败.");
+                _logger.LogError(ex, "SetPeerAppData 调用失败.");
             }
 
-            return MeetingMessage.Failure("SetRoomAppData 失败");
+            return MeetingMessage.Failure("SetPeerAppData 失败");
         }
 
         /// <summary>
@@ -1130,7 +1146,7 @@ namespace Tubumu.Meeting.Server
                 var peerPeerAppDataResult = await _scheduler.UnsetPeerAppDataAsync(UserId, ConnectionId, unsetPeerAppDataRequest);
 
                 // Notification: peerAppDataChanged
-                SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
+                SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new PeerAppDataChangedNotification
                 {
                     PeerId = UserId,
                     AppData = peerPeerAppDataResult.AppData,
@@ -1162,7 +1178,7 @@ namespace Tubumu.Meeting.Server
                 var peerPeerAppDataResult = await _scheduler.ClearPeerAppDataAsync(UserId, ConnectionId);
 
                 // Notification: peerAppDataChanged
-                SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new
+                SendNotification(peerPeerAppDataResult.OtherPeerIds, "peerAppDataChanged", new PeerAppDataChangedNotification
                 {
                     PeerId = UserId,
                     AppData = peerPeerAppDataResult.AppData,
@@ -1188,14 +1204,18 @@ namespace Tubumu.Meeting.Server
 
         private async Task CreateConsumer(string consumerPeerId, string producerPeerId, Producer producer)
         {
-            _logger.LogDebug($"CreateConsumer() | [ConsumerPeer:\"{consumerPeerId}\", ProducerPeer:\"{producerPeerId}\", Producer:\"{producer.ProducerId}\"]");
+            _logger.LogDebug($"CreateConsumer() | [ConsumerPeer:\"{consumerPeerId}\", ProducerPeer:\"{producerPeerId}\", ProducerId:\"{producer.ProducerId}\"]");
 
             // Create the Consumer in paused mode.
-            Consumer consumer;
+            Consumer? consumer;
 
             try
             {
                 consumer = await _scheduler.ConsumeAsync(producerPeerId, consumerPeerId, producer.ProducerId);
+                if(consumer == null)
+                {
+                    return;
+                }
             }
             catch (Exception ex)
             {
@@ -1204,11 +1224,16 @@ namespace Tubumu.Meeting.Server
             }
 
             // Set Consumer events.
-            consumer.On("score", (score) =>
+            consumer.On("score", data =>
             {
-                var data = (ConsumerScore)score!;
+                // For Testing
+                //var score = (ConsumerScore?)data;
+
                 // Notification: consumerScore
-                SendNotification(consumerPeerId, "consumerScore", new { ConsumerId = consumer.ConsumerId, Score = data });
+                SendNotification(consumerPeerId, "consumerScore", new ConsumerScoreNotification {
+                    ConsumerId = consumer.ConsumerId,
+                    Score = data
+                });
                 return Task.CompletedTask;
             });
 
@@ -1219,30 +1244,40 @@ namespace Tubumu.Meeting.Server
             consumer.Observer.On("close", _ =>
             {
                 // Notification: consumerClosed
-                SendNotification(consumerPeerId, "consumerClosed", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerClosed", new ConsumerClosedNotification {
+                    ConsumerId = consumer.ConsumerId
+                });
                 return Task.CompletedTask;
             });
 
             consumer.On("producerpause", _ =>
             {
                 // Notification: consumerPaused
-                SendNotification(consumerPeerId, "consumerPaused", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerPaused", new ConsumerPausedNotification {
+                    ConsumerId = consumer.ConsumerId
+                });
                 return Task.CompletedTask;
             });
 
             consumer.On("producerresume", _ =>
             {
                 // Notification: consumerResumed
-                SendNotification(consumerPeerId, "consumerResumed", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerResumed", new ConsumerResumedNotification {
+                    ConsumerId = consumer.ConsumerId
+                });
                 return Task.CompletedTask;
             });
 
-            consumer.On("layerschange", layers =>
+            consumer.On("layerschange", data =>
             {
-                var data = (ConsumerLayers?)layers;
+                // For Testing
+                //var layers = (ConsumerLayers?)data;
 
                 // Notification: consumerLayersChanged
-                SendNotification(consumerPeerId, "consumerLayersChanged", new { ConsumerId = consumer.ConsumerId });
+                SendNotification(consumerPeerId, "consumerLayersChanged", new ConsumerLayersChangedNotification {
+                    ConsumerId = consumer.ConsumerId,
+                    Layers = data
+                });
                 return Task.CompletedTask;
             });
 
@@ -1259,8 +1294,7 @@ namespace Tubumu.Meeting.Server
 
             // Send a request to the remote Peer with Consumer parameters.
             // Notification: newConsumer
-
-            SendNotification(consumerPeerId, "newConsumer", new ConsumeInfo
+            SendNotification(consumerPeerId, "newConsumer", new NewConsumerNotification
             {
                 ProducerPeerId = producerPeerId,
                 Kind = consumer.Kind,

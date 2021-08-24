@@ -403,7 +403,7 @@ namespace Tubumu.Meeting.Server
                 return new PeerPullResult
                 {
                     ExistsProducers = existsProducers.ToArray(),
-                    ProduceSources = produceSources.ToArray(),
+                    ProduceSources = produceSources,
                 };
             }
         }
@@ -427,6 +427,7 @@ namespace Tubumu.Meeting.Server
 
             // Add peerId into appData to later get the associated Peer during
             // the 'loudest' event of the audioLevelObserver.
+            produceRequest.AppData = produceRequest.AppData ?? new Dictionary<string, object>();
             produceRequest.AppData["peerId"] = PeerId;
 
             using (await _joinedLock.ReadLockAsync())
@@ -508,7 +509,7 @@ namespace Tubumu.Meeting.Server
         /// <param name="producer"></param>
         /// <param name="roomId"></param>
         /// <returns></returns>
-        public async Task<Consumer> ConsumeAsync(Peer producerPeer, string producerId)
+        public async Task<Consumer?> ConsumeAsync(Peer producerPeer, string producerId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -530,6 +531,12 @@ namespace Tubumu.Meeting.Server
 
                         using (await _consumersLock.WriteLockAsync())
                         {
+                            // 已经在消费
+                            if(_consumers.Any(m => m.Value.ProducerId == producerId))
+                            {
+                                return null;
+                            }
+
                             using (await producerPeer._producersLock.ReadLockAsync())
                             {
                                 if (!producerPeer._producers.TryGetValue(producerId, out var producer))
@@ -745,7 +752,7 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"CloseConsumerAsync() | Peer:{PeerId} has no Cmonsumer:{consumerId}.");
                         }
 
-                        consumer.CloseAsync().ContinueWithOnFaultedHandleLog(_logger);
+                        await consumer.CloseAsync();
                         return true;
                     }
                 }
@@ -1071,7 +1078,7 @@ namespace Tubumu.Meeting.Server
                         // its Producers and Consumers will also be closed.
                         foreach (var transport in _transports.Values)
                         {
-                            transport.CloseAsync().ContinueWithOnFaultedHandleLog(_logger);
+                            await transport.CloseAsync();
                         }
                     }
 
@@ -1116,7 +1123,7 @@ namespace Tubumu.Meeting.Server
                         // its Producers and Consumers will also be closed.
                         foreach (var transport in _transports.Values)
                         {
-                            transport.CloseAsync().ContinueWithOnFaultedHandleLog(_logger);
+                            await transport.CloseAsync();
                         }
                     }
 
