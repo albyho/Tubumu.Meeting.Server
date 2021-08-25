@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
 
     <PackageId>Tubumu.Meeting.Server</PackageId>
-    <Version>3.1.0</Version>
+    <Version>3.2.0</Version>
     <Authors>Alby</Authors>
     <Company>Tubumu</Company>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -46,6 +46,6 @@
     <None Remove="SignalRSwaggerGen" />
   </ItemGroup>
   <ItemGroup>
-      <None Include="README.md" Pack="true" PackagePath="\"/>
+      <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
