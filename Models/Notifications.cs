@@ -55,7 +55,7 @@ namespace Tubumu.Meeting.Server
         public RtpParameters RtpParameters { get; set; }
 
         /// <summary>
-        /// 
+        /// 消费者类型，如 SVC, Simulcast 等。 
         /// </summary>
         public ConsumerType Type { get; set; }
 
