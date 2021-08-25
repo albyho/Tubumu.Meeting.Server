@@ -133,7 +133,7 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                // FIXME: (alby)明文告知用户进入房间的 Role 存在安全问题, 特别是 Invite 模式下。
+                // FIXME: (alby) 明文告知用户进入房间的 Role 存在安全问题, 特别是 Invite 模式下。
                 var joinRoomResult = await _scheduler.JoinRoomAsync(UserId, ConnectionId, joinRoomRequest);
                 if (joinRoomResult == null)
                 {
@@ -176,7 +176,7 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                // FIXME: (alby)在 Invite 模式下，清除尚未处理的邀请。
+                // FIXME: (alby) 在 Invite 模式下，清除尚未处理的邀请。
                 var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
 
                 // Notification: peerLeaveRoom
