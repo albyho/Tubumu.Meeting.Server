@@ -6,7 +6,7 @@ namespace Tubumu.Meeting.Server
     #region 业务类通知
 
     /// <summary>
-    /// 用户进入房间的通知
+    /// 用户进入房间，通知其他用户
     /// </summary>
     public class PeerJoinRoomNotification
     {
@@ -14,7 +14,7 @@ namespace Tubumu.Meeting.Server
     }
 
     /// <summary>
-    /// 用户离开房间的通知
+    /// 用户离开房间，通知其他用户
     /// </summary>
     public class PeerLeaveRoomNotification
     {
@@ -25,7 +25,7 @@ namespace Tubumu.Meeting.Server
     }
 
     /// <summary>
-    /// 产生新消费者通知。客户端可根据该通知的信息创建本地消费者。
+    /// 产生新消费者，通知客户端进行消费。客户端可根据该通知的信息创建本地消费者。
     /// </summary>
     public class NewConsumerNotification
     {
@@ -103,7 +103,7 @@ namespace Tubumu.Meeting.Server
     }
 
     /// <summary>
-    /// 用户 AppData 改变通知
+    /// 用户 AppData 改变后，通知其他用户。
     /// </summary>
     public class PeerAppDataChangedNotification
     {
