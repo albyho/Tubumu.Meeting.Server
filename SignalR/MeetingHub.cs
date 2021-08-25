@@ -454,7 +454,7 @@ namespace Tubumu.Meeting.Server
                 };
                 foreach (var source in inviteRequest.Sources)
                 {
-                    setPeerInternalDataRequest.InternalData[$"Invate:{source}"] = true;
+                    setPeerInternalDataRequest.InternalData[$"Invite:{source}"] = true;
                 };
 
                 await _scheduler.SetPeerInternalDataAsync(setPeerInternalDataRequest);
@@ -521,7 +521,7 @@ namespace Tubumu.Meeting.Server
                 var keys = new List<string>();
                 foreach (var source in deinviteRequest.Sources)
                 {
-                    keys.Add($"Invate:{source}");
+                    keys.Add($"Invite:{source}");
                 };
                 unSetPeerInternalDataRequest.Keys = keys.ToArray();
 
@@ -621,11 +621,11 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var peerId = UserId;
-                // 在 Invate 模式下如果不是管理员需校验 Source 是否被邀请。
+                // 在 Invite 模式下如果不是管理员需校验 Source 是否被邀请。
                 if (_meetingServerOptions.ServeMode == ServeMode.Invite && await _scheduler.GetPeerRoleAsync(UserId, ConnectionId) != UserRole.Admin)
                 {
                     var internalData = await _scheduler.GetPeerInternalDataAsync(UserId, ConnectionId);
-                    var inviteKey = $"Invate:{produceRequest.Source}";
+                    var inviteKey = $"Invite:{produceRequest.Source}";
                     if (!internalData.InternalData.TryGetValue(inviteKey, out var inviteValue))
                     {
                         return MeetingMessage<ProduceRespose>.Failure("未受邀请的生产。");
