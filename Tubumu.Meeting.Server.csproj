@@ -5,9 +5,10 @@
     <Nullable>enable</Nullable>
 
     <PackageId>Tubumu.Meeting.Server</PackageId>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
     <Authors>Alby</Authors>
     <Company>Tubumu</Company>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <RepositoryUrl>https://github.com/albyho/Tubumu.Meeting.Server</RepositoryUrl> 
     <RepositoryType>git</RepositoryType>
@@ -39,9 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="SignalRSwaggerGen" />
-    <None Remove="Exceptions\" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Exceptions\" />
+      <None Include="README.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 </Project>
