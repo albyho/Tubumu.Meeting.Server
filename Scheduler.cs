@@ -343,9 +343,9 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                if (!_peers.TryGetValue(pullRequest.ProducerPeerId, out var producePeer))
+                if (!_peers.TryGetValue(pullRequest.PeerId, out var producePeer))
                 {
-                    throw new PeerNotExistsException("PullAsync()", pullRequest.ProducerPeerId);
+                    throw new PeerNotExistsException("PullAsync()", pullRequest.PeerId);
                 }
 
                 var pullResult = await peer.PullAsync(producePeer, pullRequest.Sources);

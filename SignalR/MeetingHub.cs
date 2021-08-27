@@ -459,6 +459,7 @@ namespace Tubumu.Meeting.Server
 
                 await _scheduler.SetPeerInternalDataAsync(setPeerInternalDataRequest);
 
+                // NOTE：如果对应 Source 已经在生产中，是否允许重复邀请？
                 // Notification: produceSources
                 SendNotification(inviteRequest.PeerId, "produceSources", new ProduceSourcesNotification
                 {
