@@ -452,7 +452,7 @@ namespace Tubumu.Meeting.Server
                             if (producer != null)
                             {
                                 //throw new Exception($"ProduceAsync() | Source:\"{ produceRequest.Source }\" is exists.");
-                                _logger.LogWarning($"ProduceAsync() | Source:\"{ produceRequest.Source }\" is exists.");
+                                _logger.LogWarning($"ProduceAsync() | Source:\"{produceRequest.Source}\" is exists.");
                                 return new PeerProduceResult
                                 {
                                     Producer = producer,
