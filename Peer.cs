@@ -213,7 +213,6 @@ namespace Tubumu.Meeting.Server
                             _transports.Remove(transport.TransportId);
                         }
                     });
-                    transport.Observer.On("close", _ => { return Task.CompletedTask; });
 
                     // If set, apply max incoming bitrate limit.
                     if (_webRtcTransportSettings.MaximumIncomingBitrate.HasValue && _webRtcTransportSettings.MaximumIncomingBitrate.Value > 0)
@@ -296,10 +295,17 @@ namespace Tubumu.Meeting.Server
                         _transports[transport.TransportId] = transport;
                     }
 
-                    transport.Observer.On("close", _ =>
+                    transport.On("@close", _ =>
                     {
                         _transports.Remove(transport.TransportId);
                         return Task.CompletedTask;
+                    });
+                    transport.On("routerclose", async _ =>
+                    {
+                        using (await _transportsLock.WriteLockAsync())
+                        {
+                            _transports.Remove(transport.TransportId);
+                        }
                     });
 
                     return transport;
@@ -496,7 +502,6 @@ namespace Tubumu.Meeting.Server
                                 _pullPaddings.Clear();
                                 _pullPaddingsLock.Set();
                             });
-                            producer.Observer.On("close", _ => { return Task.CompletedTask; });
 
                             await _pullPaddingsLock.WaitAsync();
                             var matchedPullPaddings = _pullPaddings.Where(m => m.Source == producer.Source).ToArray();
@@ -595,9 +600,6 @@ namespace Tubumu.Meeting.Server
                                         _consumers.Remove(consumer.ConsumerId);
                                     }
                                     producer.RemoveConsumer(consumer.ConsumerId);
-                                });
-                                consumer.Observer.On("close", _ => {
-                                    return Task.CompletedTask;
                                 });
 
                                 // Store the Consumer into the consumerPeer data Object.
