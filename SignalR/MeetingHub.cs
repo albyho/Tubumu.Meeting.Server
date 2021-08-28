@@ -967,12 +967,12 @@ namespace Tubumu.Meeting.Server
         /// <param name="transportId"></param>
         /// <returns></returns>
         [SignalRMethod(name: "GetWebRtcTransportStats", operationType: OperationType.Post)]
-        public async Task<MeetingMessage<TransportStat>> GetWebRtcTransportStats([SignalRArg] string transportId)
+        public async Task<MeetingMessage<WebRtcTransportStat>> GetWebRtcTransportStats([SignalRArg] string transportId)
         {
             try
             {
                 var data = await _scheduler.GetWebRtcTransportStatsAsync(UserId, ConnectionId, transportId);
-                return MeetingMessage<TransportStat>.Success(data, "GetWebRtcTransportStats 成功");
+                return MeetingMessage<WebRtcTransportStat>.Success(data, "GetWebRtcTransportStats 成功");
             }
             catch (MeetingException ex)
             {
@@ -983,7 +983,7 @@ namespace Tubumu.Meeting.Server
                 _logger.LogError(ex, "GetWebRtcTransportStats 调用失败.");
             }
 
-            return MeetingMessage<TransportStat>.Failure("GetWebRtcTransportStats 失败");
+            return MeetingMessage<WebRtcTransportStat>.Failure("GetWebRtcTransportStats 失败");
         }
 
         /// <summary>

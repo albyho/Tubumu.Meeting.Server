@@ -940,7 +940,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        public async Task<TransportStat> GetWebRtcTransportStatsAsync(string transportId)
+        public async Task<WebRtcTransportStat> GetWebRtcTransportStatsAsync(string transportId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -958,8 +958,8 @@ namespace Tubumu.Meeting.Server
                         }
 
                         var status = await transport.GetStatsAsync();
-                        // TODO: (alby)考虑不进行反序列化
-                        // TransportStat 系列包括：WebTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。
+                        // TODO: (alby) 考虑不进行反序列化
+                        // TransportStat 系列包括：WebRtcTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。
                         var data = JsonSerializer.Deserialize<WebRtcTransportStat>(status!)!;
                         return data;
                     }
@@ -990,7 +990,7 @@ namespace Tubumu.Meeting.Server
                         }
 
                         var status = await producer.GetStatsAsync();
-                        // TODO: (alby)考虑不进行反序列化
+                        // TODO: (alby) 考虑不进行反序列化
                         var data = JsonSerializer.Deserialize<ProducerStat>(status!)!;
                         return data;
                     }
@@ -1021,7 +1021,7 @@ namespace Tubumu.Meeting.Server
                         }
 
                         var status = await consumer.GetStatsAsync();
-                        // TODO: (alby)考虑不进行反序列化
+                        // TODO: (alby) 考虑不进行反序列化
                         var data = JsonSerializer.Deserialize<ConsumerStat>(status!)!;
                         return data;
                     }

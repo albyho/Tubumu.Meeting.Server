@@ -592,7 +592,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<TransportStat> GetWebRtcTransportStatsAsync(string peerId, string connectionId, string transportId)
+        public async Task<WebRtcTransportStat> GetWebRtcTransportStatsAsync(string peerId, string connectionId, string transportId)
         {
             using (await _peersLock.ReadLockAsync())
             {
