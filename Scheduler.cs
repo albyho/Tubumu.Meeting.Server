@@ -124,7 +124,7 @@ namespace Tubumu.Meeting.Server
 
                         // Create a mediasoup Router.
                         var worker = _mediasoupServer.GetWorker();
-                        var router = await worker!.CreateRouterAsync(new RouterOptions
+                        var router = await worker.CreateRouterAsync(new RouterOptions
                         {
                             MediaCodecs = mediaCodecs
                         });
@@ -273,7 +273,7 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                Peer targetPeer;
+                Peer? targetPeer;
                 if(peerId == targetPeerId)
                 {
                     targetPeer = peer;
@@ -458,7 +458,7 @@ namespace Tubumu.Meeting.Server
 
                 CheckConnection(peer, connectionId);
 
-                Peer targetPeer;
+                Peer? targetPeer;
                 if (peerId == targetPeerId)
                 {
                     targetPeer = peer;
@@ -592,7 +592,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<WebRtcTransportStat> GetWebRtcTransportStatsAsync(string peerId, string connectionId, string transportId)
+        public async Task<WebRtcTransportStat?> GetWebRtcTransportStatsAsync(string peerId, string connectionId, string transportId)
         {
             using (await _peersLock.ReadLockAsync())
             {
@@ -607,7 +607,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<ProducerStat> GetProducerStatsAsync(string peerId, string connectionId, string producerId)
+        public async Task<ProducerStat?> GetProducerStatsAsync(string peerId, string connectionId, string producerId)
         {
             using (await _peersLock.ReadLockAsync())
             {
@@ -622,7 +622,7 @@ namespace Tubumu.Meeting.Server
             }
         }
 
-        public async Task<ConsumerStat> GetConsumerStatsAsync(string peerId, string connectionId, string consumerId)
+        public async Task<ConsumerStat?> GetConsumerStatsAsync(string peerId, string connectionId, string consumerId)
         {
             using (await _peersLock.ReadLockAsync())
             {

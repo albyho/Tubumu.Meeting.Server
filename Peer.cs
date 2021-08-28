@@ -29,7 +29,7 @@ namespace Tubumu.Meeting.Server
         [JsonIgnore]
         public ConcurrentDictionary<string, object> InternalData { get; set; }
 
-        public bool Equals(Peer other)
+        public bool Equals(Peer? other)
         {
             if (other == null)
                 return false;
@@ -37,7 +37,7 @@ namespace Tubumu.Meeting.Server
             return PeerId == other.PeerId;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj == null)
                 return false;
@@ -200,13 +200,13 @@ namespace Tubumu.Meeting.Server
                         _transports[transport.TransportId] = transport;
                     }
 
-                    transport.On("@close", _ =>
+                    transport.On("@close", (_, _) =>
                     {
                         // 因为调用 transport.Close() 之前已经使用 _transportsLock 写锁，所以触发该事件的调用从 _transports 移除无需再次加锁。
                         _transports.Remove(transport.TransportId);
                         return Task.CompletedTask;
                     });
-                    transport.On("routerclose", async _ =>
+                    transport.On("routerclose", async (_, _) =>
                     {
                         using (await _transportsLock.WriteLockAsync())
                         {
@@ -295,12 +295,13 @@ namespace Tubumu.Meeting.Server
                         _transports[transport.TransportId] = transport;
                     }
 
-                    transport.On("@close", _ =>
+                    transport.On("@close", (_, _) =>
                     {
+                        // 因为调用 transport.CloseAsync() 之前已经使用 _transportsLock 写锁，所以触发该事件的调用从 _transports 移除无需再次加锁。
                         _transports.Remove(transport.TransportId);
                         return Task.CompletedTask;
                     });
-                    transport.On("routerclose", async _ =>
+                    transport.On("routerclose", async (_, _) =>
                     {
                         using (await _transportsLock.WriteLockAsync())
                         {
@@ -375,7 +376,7 @@ namespace Tubumu.Meeting.Server
             var consumerActiveRoom = _room!;
             var producerActiveRoom = producerPeer._room!;
 
-            var roomId = _room!.RoomId;
+            var roomId = consumerActiveRoom.RoomId;
 
             using (await producerPeer._producersLock.ReadLockAsync())
             {
@@ -400,7 +401,7 @@ namespace Tubumu.Meeting.Server
                     // 如果 Source 没有对应的 Producer，通知 otherPeer 生产；生产成功后又要通知本 Peer 去对应的 Room 消费。
                     if (!producerPeer._pullPaddings.Any(m => m.Source == source))
                     {
-                        produceSources.Add(source!);
+                        produceSources.Add(source);
                     }
                     if (!producerPeer._pullPaddings.Any(m => m.Source == source && m.RoomId == roomId && m.ConsumerPeerId == PeerId))
                     {
@@ -408,7 +409,7 @@ namespace Tubumu.Meeting.Server
                         {
                             RoomId = roomId,
                             ConsumerPeerId = PeerId,
-                            Source = source!,
+                            Source = source,
                         });
                     }
                     producerPeer._pullPaddingsLock.Set();
@@ -484,7 +485,7 @@ namespace Tubumu.Meeting.Server
                             // Store producer source
                             producer.Source = produceRequest.Source;
 
-                            producer.On("@close", async _ => {
+                            producer.On("@close", async (_, _) => {
                                 // 因为调用 producer.Close() 之前已经使用 _producersLock 写锁，所以触发该事件的调用从 _producers 移除无需再次加锁。
                                 _producers.Remove(producer.ProducerId);
 
@@ -492,7 +493,7 @@ namespace Tubumu.Meeting.Server
                                 _pullPaddings.Clear();
                                 _pullPaddingsLock.Set();
                             });
-                            producer.On("transportclose", async _ => {
+                            producer.On("transportclose", async (_, _) => {
                                 using (await _producersLock.WriteLockAsync())
                                 {
                                     _producers.Remove(producer.ProducerId);
@@ -581,21 +582,14 @@ namespace Tubumu.Meeting.Server
 
                                 consumer.Source = producer.Source;
 
-                                consumer.On("@close", _ => {
+                                consumer.On("@close", (_, _) => {
                                     // 因为调用 consumer.CloseAsync() 之前已经使用 _consumersLock 写锁，所以触发该事件的调用从 _consumers 移除无需再次加锁。
                                     _consumers.Remove(consumer.ConsumerId);
                                     producer.RemoveConsumer(consumer.ConsumerId);
                                     return Task.CompletedTask;
                                 });
-                                consumer.On("producerclose", async _ => {
+                                consumer.On("producerclose,transportclose", async (_, _) => {
                                     using(await _consumersLock.WriteLockAsync())
-                                    {
-                                        _consumers.Remove(consumer.ConsumerId);
-                                    }
-                                    producer.RemoveConsumer(consumer.ConsumerId);
-                                });
-                                consumer.On("transportclose", async _ => {
-                                    using (await _consumersLock.WriteLockAsync())
                                     {
                                         _consumers.Remove(consumer.ConsumerId);
                                     }
@@ -942,7 +936,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        public async Task<WebRtcTransportStat> GetWebRtcTransportStatsAsync(string transportId)
+        public async Task<WebRtcTransportStat?> GetWebRtcTransportStatsAsync(string transportId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -959,11 +953,14 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"GetWebRtcTransportStatsAsync() | Peer:{PeerId} has no Transport:{transportId}.");
                         }
 
-                        var status = await transport.GetStatsAsync();
+                        var status = await transport!.GetStatsAsync();
+                        if(status == null)
+                        {
+                            return null;
+                        }
                         // TODO: (alby) 考虑不进行反序列化
                         // TransportStat 系列包括：WebRtcTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。
-                        var data = JsonSerializer.Deserialize<WebRtcTransportStat>(status!)!;
-                        return data;
+                        return JsonSerializer.Deserialize<WebRtcTransportStat>(status);
                     }
                 }
             }
@@ -974,7 +971,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        public async Task<ProducerStat> GetProducerStatsAsync(string producerId)
+        public async Task<ProducerStat?> GetProducerStatsAsync(string producerId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -991,10 +988,13 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"GetProducerStatsAsync() | Peer:{PeerId} has no Producer:{producerId}.");
                         }
 
-                        var status = await producer.GetStatsAsync();
+                        var stats = await producer.GetStatsAsync();
+                        if (stats == null)
+                        {
+                            return null;
+                        }
                         // TODO: (alby) 考虑不进行反序列化
-                        var data = JsonSerializer.Deserialize<ProducerStat>(status!)!;
-                        return data;
+                        return JsonSerializer.Deserialize<ProducerStat>(stats);
                     }
                 }
             }
@@ -1005,7 +1005,7 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        public async Task<ConsumerStat> GetConsumerStatsAsync(string consumerId)
+        public async Task<ConsumerStat?> GetConsumerStatsAsync(string consumerId)
         {
             using (await _joinedLock.ReadLockAsync())
             {
@@ -1022,10 +1022,13 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"GetConsumerStatsAsync() | Peer:{PeerId} has no Consumer:{consumerId}.");
                         }
 
-                        var status = await consumer.GetStatsAsync();
+                        var stats = await consumer.GetStatsAsync();
+                        if (stats == null)
+                        {
+                            return null;
+                        }
                         // TODO: (alby) 考虑不进行反序列化
-                        var data = JsonSerializer.Deserialize<ConsumerStat>(status!)!;
-                        return data;
+                        return JsonSerializer.Deserialize<ConsumerStat>(stats);
                     }
                 }
             }
@@ -1053,7 +1056,7 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"RestartIceAsync() | Peer:{PeerId} has no Transport:{transportId}.");
                         }
 
-                        if (!(transport is WebRtcTransport webRtcTransport))
+                        if (transport is not WebRtcTransport webRtcTransport)
                         {
                             throw new Exception($"RestartIceAsync() | Peer:{PeerId} Transport:{transportId} is not WebRtcTransport.");
                         }
@@ -1405,12 +1408,12 @@ namespace Tubumu.Meeting.Server
 
         #region Private Methods
 
-        private Transport GetProducingTransport()
+        private Transport? GetProducingTransport()
         {
             return _transports.Values.Where(m => m.AppData != null && m.AppData.TryGetValue("Producing", out var value) && (bool)value).FirstOrDefault();
         }
 
-        private Transport GetConsumingTransport()
+        private Transport? GetConsumingTransport()
         {
             return _transports.Values.Where(m => m.AppData != null && m.AppData.TryGetValue("Consuming", out var value) && (bool)value).FirstOrDefault();
         }
@@ -1443,12 +1446,12 @@ namespace Tubumu.Meeting.Server
 
         private async Task<string[]> GetPeerIdsInteralAsync()
         {
-            return _room != null ? await _room!.GetPeerIdsAsync() : Array.Empty<string>();
+            return _room != null ? await _room.GetPeerIdsAsync() : Array.Empty<string>();
         }
 
         private async Task<Peer[]> GetPeersInteralAsync()
         {
-            return _room != null ? await _room!.GetPeersAsync() : Array.Empty<Peer>();
+            return _room != null ? await _room.GetPeersAsync() : Array.Empty<Peer>();
         }
 
         #endregion Private Methods

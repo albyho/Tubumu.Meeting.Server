@@ -23,7 +23,7 @@ namespace Tubumu.Meeting.Server
         private readonly Scheduler _scheduler;
         private readonly MeetingServerOptions _meetingServerOptions;
 
-        private string UserId => Context.UserIdentifier;
+        private string UserId => Context.UserIdentifier!;
         private string ConnectionId => Context.ConnectionId;
 
         public MeetingHub(ILogger<MeetingHub> logger,
@@ -46,7 +46,7 @@ namespace Tubumu.Meeting.Server
             await base.OnConnectedAsync();
         }
 
-        public override async Task OnDisconnectedAsync(Exception exception)
+        public override async Task OnDisconnectedAsync(Exception? exception)
         {
             await LeaveAsync();
             await base.OnDisconnectedAsync(exception);
@@ -235,18 +235,18 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var transport = await _scheduler.CreateWebRtcTransportAsync(UserId, ConnectionId, createWebRtcTransportRequest, isSend);
-                transport.On("sctpstatechange", sctpState =>
+                transport.On("sctpstatechange", (_, obj) =>
                 {
-                    _logger.LogDebug($"WebRtcTransport \"sctpstatechange\" event [sctpState:{sctpState}]");
+                    _logger.LogDebug($"WebRtcTransport \"sctpstatechange\" event [sctpState:{obj}]");
                     return Task.CompletedTask;
                 });
 
-                transport.On("dtlsstatechange", value =>
+                transport.On("dtlsstatechange", (_, obj) =>
                 {
-                    var dtlsState = (DtlsState)value!;
+                    var dtlsState = (DtlsState)obj!;
                     if (dtlsState == DtlsState.Failed || dtlsState == DtlsState.Closed)
                     {
-                        _logger.LogWarning($"WebRtcTransport dtlsstatechange event [dtlsState:{value}]");
+                        _logger.LogWarning($"WebRtcTransport dtlsstatechange event [dtlsState:{obj}]");
                     }
                     return Task.CompletedTask;
                 });
@@ -256,9 +256,9 @@ namespace Tubumu.Meeting.Server
                 //await transport.EnableTraceEventAsync(new[] { TransportTraceEventType.BWE });
 
                 var peerId = UserId;
-                transport.On("trace", trace =>
+                transport.On("trace", (_, obj) =>
                 {
-                    var traceData = (TransportTraceEventData)trace!;
+                    var traceData = (TransportTraceEventData)obj!;
                     _logger.LogDebug($"transport \"trace\" event [transportId:{transport.TransportId}, trace:{traceData.Type.GetEnumMemberValue()}]");
 
                     if (traceData.Type == TransportTraceEventType.BWE && traceData.Direction == TraceEventDirection.Out)
@@ -656,16 +656,15 @@ namespace Tubumu.Meeting.Server
                 //CreateConsumer(producerPeer, producerPeer, producer, "1").ContinueWithOnFaultedHandleLog(_logger);
 
                 // Set Producer events.
-                producer.On("score", score =>
+                producer.On("score", (_, obj) =>
                 {
-                    var data = (ProducerScore[])score!;
                     // Notification: producerScore
                     SendNotification(peerId, "producerScore", new ProducerScoreNotification {
-                        ProducerId = producer.ProducerId, Score = data
+                        ProducerId = producer.ProducerId, Score = obj
                     });
                     return Task.CompletedTask;
                 });
-                producer.On("videoorientationchange", data =>
+                producer.On("videoorientationchange", (_, obj) =>
                 {
                     // For Testing
                     //var videoOrientation= (ProducerVideoOrientation?)data;
@@ -673,11 +672,11 @@ namespace Tubumu.Meeting.Server
                     // Notification: videoorientationchange
                     SendNotification(peerId, "producerVideoOrientationChanged", new ProducerVideoOrientationChangedNotification {
                         ProducerId = producer.ProducerId,
-                        VideoOrientation = data
+                        VideoOrientation = obj
                     });
                     return Task.CompletedTask;
                 });
-                producer.Observer.On("close", _ =>
+                producer.Observer.On("close", (_, _) =>
                 {
                     // Notification: producerClosed
                     SendNotification(peerId, "producerClosed", new ProducerClosedNotification {
@@ -972,6 +971,10 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var data = await _scheduler.GetWebRtcTransportStatsAsync(UserId, ConnectionId, transportId);
+                if(data == null)
+                {
+                    return MeetingMessage<WebRtcTransportStat>.Failure("GetWebRtcTransportStats 失败");
+                }
                 return MeetingMessage<WebRtcTransportStat>.Success(data, "GetWebRtcTransportStats 成功");
             }
             catch (MeetingException ex)
@@ -997,6 +1000,10 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var data = await _scheduler.GetProducerStatsAsync(UserId, ConnectionId, producerId);
+                if(data == null)
+                {
+                    return MeetingMessage<ProducerStat>.Failure("GetProducerStats 失败");
+                }
                 return MeetingMessage<ProducerStat>.Success(data, "GetProducerStats 成功");
             }
             catch (MeetingException ex)
@@ -1022,6 +1029,10 @@ namespace Tubumu.Meeting.Server
             try
             {
                 var data = await _scheduler.GetConsumerStatsAsync(UserId, ConnectionId, consumerId);
+                if(data == null)
+                {
+                    return MeetingMessage<ConsumerStat>.Failure("GetConsumerStats 失败");
+                }
                 return MeetingMessage<ConsumerStat>.Success(data, "GetConsumerStats 成功");
             }
             catch (MeetingException ex)
@@ -1225,24 +1236,24 @@ namespace Tubumu.Meeting.Server
             }
 
             // Set Consumer events.
-            consumer.On("score", data =>
+            consumer.On("score", (_, obj) =>
             {
                 // For Testing
-                //var score = (ConsumerScore?)data;
+                //var score = (ConsumerScore?)obj;
 
                 // Notification: consumerScore
                 SendNotification(consumerPeerId, "consumerScore", new ConsumerScoreNotification {
                     ConsumerId = consumer.ConsumerId,
-                    Score = data
+                    Score = obj
                 });
                 return Task.CompletedTask;
             });
 
-            // consumer.On("@close", _ => ...);
-            // consumer.On("@producerclose", _ => ...);
-            // consumer.On("producerclose", _ => ...);
-            // consumer.On("transportclose", _ => ...);
-            consumer.Observer.On("close", _ =>
+            // consumer.On("@close", (_, _) => ...);
+            // consumer.On("@producerclose", (_, _) => ...);
+            // consumer.On("producerclose", (_, _) => ...);
+            // consumer.On("transportclose", (_, _) => ...);
+            consumer.Observer.On("close", (_, _) =>
             {
                 // Notification: consumerClosed
                 SendNotification(consumerPeerId, "consumerClosed", new ConsumerClosedNotification {
@@ -1251,7 +1262,7 @@ namespace Tubumu.Meeting.Server
                 return Task.CompletedTask;
             });
 
-            consumer.On("producerpause", _ =>
+            consumer.On("producerpause", (_, _) =>
             {
                 // Notification: consumerPaused
                 SendNotification(consumerPeerId, "consumerPaused", new ConsumerPausedNotification {
@@ -1260,7 +1271,7 @@ namespace Tubumu.Meeting.Server
                 return Task.CompletedTask;
             });
 
-            consumer.On("producerresume", _ =>
+            consumer.On("producerresume", (_, _) =>
             {
                 // Notification: consumerResumed
                 SendNotification(consumerPeerId, "consumerResumed", new ConsumerResumedNotification {
@@ -1269,15 +1280,15 @@ namespace Tubumu.Meeting.Server
                 return Task.CompletedTask;
             });
 
-            consumer.On("layerschange", data =>
+            consumer.On("layerschange", (_, obj) =>
             {
                 // For Testing
-                //var layers = (ConsumerLayers?)data;
+                //var layers = (ConsumerLayers?)obj;
 
                 // Notification: consumerLayersChanged
                 SendNotification(consumerPeerId, "consumerLayersChanged", new ConsumerLayersChangedNotification {
                     ConsumerId = consumer.ConsumerId,
-                    Layers = data
+                    Layers = obj
                 });
                 return Task.CompletedTask;
             });
@@ -1287,9 +1298,9 @@ namespace Tubumu.Meeting.Server
             // await consumer.enableTraceEvent([ 'pli', 'fir' ]);
             // await consumer.enableTraceEvent([ 'keyframe' ]);
 
-            consumer.On("trace", trace =>
+            consumer.On("trace", (_, obj) =>
             {
-                _logger.LogDebug($"consumer \"trace\" event [consumerId:{consumer.ConsumerId}, trace:{trace}]");
+                _logger.LogDebug($"consumer \"trace\" event [consumerId:{consumer.ConsumerId}, trace:{obj}]");
                 return Task.CompletedTask;
             });
 

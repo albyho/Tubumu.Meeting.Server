@@ -15,7 +15,7 @@ namespace Tubumu.Meeting.Server
 
         public string Name { get; }
 
-        public bool Equals(Room other)
+        public bool Equals(Room? other)
         {
             if (other == null)
                 return false;
@@ -23,7 +23,7 @@ namespace Tubumu.Meeting.Server
             return RoomId == other.RoomId;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj == null)
                 return false;
