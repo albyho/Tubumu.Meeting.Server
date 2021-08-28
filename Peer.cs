@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Force.DeepCloner;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Threading;
 using Tubumu.Core.Extensions;
@@ -201,11 +200,20 @@ namespace Tubumu.Meeting.Server
                         _transports[transport.TransportId] = transport;
                     }
 
-                    transport.Observer.On("close", _ =>
+                    transport.On("@close", _ =>
                     {
+                        // 因为调用 transport.Close() 之前已经使用 _transportsLock 写锁，所以触发该事件的调用从 _transports 移除无需再次加锁。
                         _transports.Remove(transport.TransportId);
                         return Task.CompletedTask;
                     });
+                    transport.On("routerclose", async _ =>
+                    {
+                        using (await _transportsLock.WriteLockAsync())
+                        {
+                            _transports.Remove(transport.TransportId);
+                        }
+                    });
+                    transport.Observer.On("close", _ => { return Task.CompletedTask; });
 
                     // If set, apply max incoming bitrate limit.
                     if (_webRtcTransportSettings.MaximumIncomingBitrate.HasValue && _webRtcTransportSettings.MaximumIncomingBitrate.Value > 0)
@@ -470,16 +478,25 @@ namespace Tubumu.Meeting.Server
                             // Store producer source
                             producer.Source = produceRequest.Source;
 
-                            //producer.On("@close", _ => ...);
-                            //producer.On("transportclose", _ => ...);
-                            producer.Observer.On("close", async _ =>
-                            {
+                            producer.On("@close", async _ => {
+                                // 因为调用 producer.Close() 之前已经使用 _producersLock 写锁，所以触发该事件的调用从 _producers 移除无需再次加锁。
                                 _producers.Remove(producer.ProducerId);
 
                                 await _pullPaddingsLock.WaitAsync();
                                 _pullPaddings.Clear();
                                 _pullPaddingsLock.Set();
                             });
+                            producer.On("transportclose", async _ => {
+                                using (await _producersLock.WriteLockAsync())
+                                {
+                                    _producers.Remove(producer.ProducerId);
+                                }
+
+                                await _pullPaddingsLock.WaitAsync();
+                                _pullPaddings.Clear();
+                                _pullPaddingsLock.Set();
+                            });
+                            producer.Observer.On("close", _ => { return Task.CompletedTask; });
 
                             await _pullPaddingsLock.WaitAsync();
                             var matchedPullPaddings = _pullPaddings.Where(m => m.Source == producer.Source).ToArray();
@@ -559,13 +576,27 @@ namespace Tubumu.Meeting.Server
 
                                 consumer.Source = producer.Source;
 
-                                //consumer.On("@close", _ => ...);
-                                //consumer.On("producerclose", _ => ...);
-                                //consumer.On("transportclose", _ => ...);
-                                consumer.Observer.On("close", _ =>
-                                {
+                                consumer.On("@close", _ => {
+                                    // 因为调用 consumer.CloseAsync() 之前已经使用 _consumersLock 写锁，所以触发该事件的调用从 _consumers 移除无需再次加锁。
                                     _consumers.Remove(consumer.ConsumerId);
                                     producer.RemoveConsumer(consumer.ConsumerId);
+                                    return Task.CompletedTask;
+                                });
+                                consumer.On("producerclose", async _ => {
+                                    using(await _consumersLock.WriteLockAsync())
+                                    {
+                                        _consumers.Remove(consumer.ConsumerId);
+                                    }
+                                    producer.RemoveConsumer(consumer.ConsumerId);
+                                });
+                                consumer.On("transportclose", async _ => {
+                                    using (await _consumersLock.WriteLockAsync())
+                                    {
+                                        _consumers.Remove(consumer.ConsumerId);
+                                    }
+                                    producer.RemoveConsumer(consumer.ConsumerId);
+                                });
+                                consumer.Observer.On("close", _ => {
                                     return Task.CompletedTask;
                                 });
 
@@ -597,7 +628,7 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _producersLock.WriteLockAsync())
                     {
                         if (!_producers.TryGetValue(producerId, out var producer))
@@ -627,7 +658,7 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _producersLock.WriteLockAsync())
                     {
                         var producers = _producers.Values.ToArray();
@@ -656,7 +687,7 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _producersLock.WriteLockAsync())
                     {
                         var producers = _producers.Values.Where(m => sources.Contains(m.Source)).ToArray();
@@ -744,7 +775,7 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _consumersLock.WriteLockAsync())
                     {
                         if (!_consumers.TryGetValue(consumerId, out var consumer))
@@ -1071,7 +1102,7 @@ namespace Tubumu.Meeting.Server
                 {
                     CheckRoom();
 
-                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _transportsLock.WriteLockAsync())
                     {
                         // Iterate and close all mediasoup Transport associated to this Peer, so all
@@ -1116,7 +1147,7 @@ namespace Tubumu.Meeting.Server
 
                 using (await _roomLock.WriteLockAsync())
                 {
-                    // NOTE: 因为 Close 会触发 Observer.Emit("close")，而 close 的事件处理需要写锁。故使用写锁。
+                    // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _transportsLock.WriteLockAsync())
                     {
                         // Iterate and close all mediasoup Transport associated to this Peer, so all
