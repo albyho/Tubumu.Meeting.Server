@@ -953,14 +953,14 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"GetWebRtcTransportStatsAsync() | Peer:{PeerId} has no Transport:{transportId}.");
                         }
 
-                        var status = await transport!.GetStatsAsync();
-                        if(status == null)
+                        var stats = await transport!.GetStatsAsync();
+                        if(stats == null)
                         {
                             return null;
                         }
                         // TODO: (alby) 考虑不进行反序列化
                         // TransportStat 系列包括：WebRtcTransportStat、PlainTransportStat、PipeTransportStat 和 DirectTransportStat。
-                        return JsonSerializer.Deserialize<WebRtcTransportStat>(status);
+                        return JsonSerializer.Deserialize<WebRtcTransportStat>(stats);
                     }
                 }
             }
