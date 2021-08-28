@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.808.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tubumu.Meeting.Server", "Tubumu.Meeting.Server.csproj", "{09A3ED00-E3E3-45D9-9492-E92512058EB0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tubumu.Core", "..\Tubumu.Core\Tubumu.Core.csproj", "{7E12A921-19AC-42EB-BB54-59E87192E122}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tubumu.Utils", "..\Tubumu.Utils\Tubumu.Utils.csproj", "{7E12A921-19AC-42EB-BB54-59E87192E122}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tubumu.Libuv", "..\Tubumu.Libuv\Tubumu.Libuv.csproj", "{8C6B440D-58BB-45BB-AD9B-87FA264CE605}"
 EndProject

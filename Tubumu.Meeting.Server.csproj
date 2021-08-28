@@ -36,7 +36,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Tubumu.Core\Tubumu.Core.csproj" />
+    <ProjectReference Include="..\Tubumu.Utils\Tubumu.Utils.csproj" />
     <ProjectReference Include="..\Tubumu.Libuv\Tubumu.Libuv.csproj" />
     <ProjectReference Include="..\Tubumu.Mediasoup.Common\Tubumu.Mediasoup.Common.csproj" />
     <ProjectReference Include="..\Tubumu.Mediasoup\Tubumu.Mediasoup.csproj" />

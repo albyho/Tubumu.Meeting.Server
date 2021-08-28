@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using SignalRSwaggerGen.Attributes;
-using Tubumu.Core.Extensions;
+using Tubumu.Utils.Extensions;
 using Tubumu.Mediasoup;
 using Tubumu.Mediasoup.Extensions;
 
