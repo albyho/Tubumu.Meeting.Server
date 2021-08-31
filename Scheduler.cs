@@ -468,7 +468,7 @@ namespace Tubumu.Meeting.Server
                     throw new PeerNotExistsException("CloseProducerWithSourcesAsync()", targetPeerId);
                 }
 
-                return await peer.CloseProducerWithSourcesAsync(sources);
+                return await targetPeer.CloseProducerWithSourcesAsync(sources);
             }
         }
 
