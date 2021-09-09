@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using SignalRSwaggerGen.Attributes;
 using Tubumu.Utils.Extensions;
 using Tubumu.Mediasoup;
 using Tubumu.Mediasoup.Extensions;
@@ -14,7 +13,6 @@ using Tubumu.Mediasoup.Extensions;
 namespace Tubumu.Meeting.Server
 {
     [Authorize]
-    [SignalRHub(path: "/hubs/meetingHub")]
     public partial class MeetingHub : Hub<IPeer>
     {
         private readonly ILogger<MeetingHub> _logger;
@@ -89,7 +87,6 @@ namespace Tubumu.Meeting.Server
         /// Get RTP capabilities of router.
         /// </summary>
         /// <returns></returns>
-        [SignalRMethod(name: "GetRouterRtpCapabilities", operationType: OperationType.Get)]
         public MeetingMessage<RtpCapabilities> GetRouterRtpCapabilities()
         {
             var rtpCapabilities = _scheduler.DefaultRtpCapabilities;
@@ -101,7 +98,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="joinRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "Join", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Join([SignalRArg] JoinRequest joinRequest)
         {
             try
@@ -128,7 +124,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="joinRoomRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "JoinRoom", operationType: OperationType.Post)]
         public async Task<MeetingMessage<JoinRoomResponse>> JoinRoom([SignalRArg] JoinRoomRequest joinRoomRequest)
         {
             try
@@ -171,7 +166,6 @@ namespace Tubumu.Meeting.Server
         /// Leave room.
         /// </summary>
         /// <returns></returns>
-        [SignalRMethod(name: "LeaveRoom", operationType: OperationType.Get)]
         public async Task<MeetingMessage> LeaveRoom()
         {
             try
@@ -208,7 +202,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "CreateSendWebRtcTransport", operationType: OperationType.Post)]
         public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateSendWebRtcTransport([SignalRArg] CreateWebRtcTransportRequest createWebRtcTransportRequest)
         {
             return CreateWebRtcTransportAsync(createWebRtcTransportRequest, true);
@@ -219,7 +212,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="createWebRtcTransportRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "CreateRecvWebRtcTransport", operationType: OperationType.Post)]
         public Task<MeetingMessage<CreateWebRtcTransportResult>> CreateRecvWebRtcTransport([SignalRArg] CreateWebRtcTransportRequest createWebRtcTransportRequest)
         {
             return CreateWebRtcTransportAsync(createWebRtcTransportRequest, false);
@@ -301,7 +293,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="connectWebRtcTransportRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "ConnectWebRtcTransport", operationType: OperationType.Post)]
         public async Task<MeetingMessage> ConnectWebRtcTransport([SignalRArg] ConnectWebRtcTransportRequest connectWebRtcTransportRequest)
         {
             try
@@ -323,7 +314,6 @@ namespace Tubumu.Meeting.Server
             return MeetingMessage.Failure($"ConnectWebRtcTransport 失败: TransportId: {connectWebRtcTransportRequest.TransportId}");
         }
 
-        [SignalRMethod(name: "Ready", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Ready()
         {
             if (_meetingServerOptions.ServeMode == ServeMode.Open || _meetingServerOptions.ServeMode == ServeMode.Invite)
@@ -366,7 +356,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="pullRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "Pull", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Pull([SignalRArg] PullRequest pullRequest)
         {
             if (_meetingServerOptions.ServeMode != ServeMode.Pull)
@@ -418,7 +407,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="inviteRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "Invite", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Invite([SignalRArg] InviteRequest inviteRequest)
         {
             if (_meetingServerOptions.ServeMode != ServeMode.Invite)
@@ -485,7 +473,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="inviteRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "Deinvite", operationType: OperationType.Post)]
         public async Task<MeetingMessage> Deinvite([SignalRArg] DeinviteRequest deinviteRequest)
         {
             if (_meetingServerOptions.ServeMode != ServeMode.Invite)
@@ -555,7 +542,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="inviteRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "RequestProduce", operationType: OperationType.Post)]
         public async Task<MeetingMessage> RequestProduce([SignalRArg] RequestProduceRequest requestProduceRequest)
         {
             if (_meetingServerOptions.ServeMode != ServeMode.Invite)
@@ -610,7 +596,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="produceRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "Produce", operationType: OperationType.Post)]
         public async Task<MeetingMessage<ProduceRespose>> Produce([SignalRArg] ProduceRequest produceRequest)
         {
             // HACK: (alby) Android 传入 RtpParameters 有误的临时处理方案。See: https://mediasoup.discourse.group/t/audio-codec-channel-not-supported/1877
@@ -707,7 +692,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "CloseProducer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> CloseProducer([SignalRArg] string producerId)
         {
             try
@@ -734,7 +718,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "PauseProducer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> PauseProducer([SignalRArg] string producerId)
         {
             try
@@ -761,7 +744,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "ResumeProducer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> ResumeProducer([SignalRArg] string producerId)
         {
             try
@@ -792,7 +774,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "CloseConsumer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> CloseConsumer([SignalRArg] string consumerId)
         {
             try
@@ -819,7 +800,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "PauseConsumer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> PauseConsumer([SignalRArg] string consumerId)
         {
             try
@@ -846,7 +826,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "ResumeConsumer", operationType: OperationType.Post)]
         public async Task<MeetingMessage> ResumeConsumer([SignalRArg] string consumerId)
         {
             try
@@ -880,7 +859,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="setConsumerPreferedLayersRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "SetConsumerPreferedLayers", operationType: OperationType.Post)]
         public async Task<MeetingMessage> SetConsumerPreferedLayers([SignalRArg] SetConsumerPreferedLayersRequest setConsumerPreferedLayersRequest)
         {
             try
@@ -907,7 +885,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="setConsumerPriorityRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "SetConsumerPriority", operationType: OperationType.Post)]
         public async Task<MeetingMessage> SetConsumerPriority([SignalRArg] SetConsumerPriorityRequest setConsumerPriorityRequest)
         {
             try
@@ -934,7 +911,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "RequestConsumerKeyFrame", operationType: OperationType.Post)]
         public async Task<MeetingMessage> RequestConsumerKeyFrame([SignalRArg] string consumerId)
         {
             try
@@ -965,7 +941,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "GetWebRtcTransportStats", operationType: OperationType.Post)]
         public async Task<MeetingMessage<WebRtcTransportStat>> GetWebRtcTransportStats([SignalRArg] string transportId)
         {
             try
@@ -994,7 +969,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="producerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "GetProducerStats", operationType: OperationType.Post)]
         public async Task<MeetingMessage<ProducerStat>> GetProducerStats([SignalRArg] string producerId)
         {
             try
@@ -1023,7 +997,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="consumerId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "GetConsumerStats", operationType: OperationType.Post)]
         public async Task<MeetingMessage<ConsumerStat>> GetConsumerStats([SignalRArg] string consumerId)
         {
             try
@@ -1052,7 +1025,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="transportId"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "RestartIce", operationType: OperationType.Post)]
         public async Task<MeetingMessage<IceParameters>> RestartIce([SignalRArg] string transportId)
         {
             try
@@ -1081,7 +1053,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="sendMessageRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "SendMessage", operationType: OperationType.Post)]
         public async Task<MeetingMessage> SendMessage([SignalRArg] SendMessageRequest sendMessageRequest)
         {
             try
@@ -1117,7 +1088,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="setPeerAppDataRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "SetPeerAppData", operationType: OperationType.Post)]
         public async Task<MeetingMessage> SetPeerAppData([SignalRArg] SetPeerAppDataRequest setPeerAppDataRequest)
         {
             try
@@ -1150,7 +1120,6 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         /// <param name="unsetPeerAppDataRequest"></param>
         /// <returns></returns>
-        [SignalRMethod(name: "UnsetPeerAppData", operationType: OperationType.Post)]
         public async Task<MeetingMessage> UnsetPeerAppData([SignalRArg] UnsetPeerAppDataRequest unsetPeerAppDataRequest)
         {
             try
@@ -1182,7 +1151,6 @@ namespace Tubumu.Meeting.Server
         /// Clear peer's appData. Then notify other peer, if in a room.
         /// </summary>
         /// <returns></returns>
-        [SignalRMethod(name: "ClearPeerAppData", operationType: OperationType.Get)]
         public async Task<MeetingMessage> ClearPeerAppData()
         {
             try
