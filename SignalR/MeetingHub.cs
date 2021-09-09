@@ -176,7 +176,7 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                // FIXME: (alby) 在 Invite 模式下，清除尚未处理的邀请。
+                // FIXME: (alby) 在 Invite 模式下，清除尚未处理的邀请。避免在会议室A受邀请后，离开会议室A进入会议室B，误受邀请。
                 var leaveRoomResult = await _scheduler.LeaveRoomAsync(UserId, ConnectionId);
 
                 // Notification: peerLeaveRoom
