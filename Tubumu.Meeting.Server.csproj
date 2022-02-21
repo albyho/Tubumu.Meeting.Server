@@ -30,9 +30,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Connections" Version="1.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="5.0.9" />
-    <PackageReference Include="Nito.AsyncEx.Coordination" Version="5.1.0" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.12.2" />
-    <PackageReference Include="SignalRSwaggerGen" Version="2.1.2" />
+    <PackageReference Include="Nito.AsyncEx.Coordination" Version="5.1.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.16.0" />
+    <PackageReference Include="SignalRSwaggerGen" Version="3.0.0" />
   </ItemGroup>
 
   <ItemGroup>
