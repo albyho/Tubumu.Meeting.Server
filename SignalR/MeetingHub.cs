@@ -81,6 +81,11 @@ namespace Tubumu.Meeting.Server
 
     public partial class MeetingHub
     {
+        public MeetingMessage<object> GetServeMode()
+        {
+            return MeetingMessage<object>.Success(new { _meetingServerOptions.ServeMode }, "GetServeMode 成功");
+        }
+
         #region Room
 
         /// <summary>
@@ -344,7 +349,7 @@ namespace Tubumu.Meeting.Server
 
             }
 
-            return MeetingMessage.Failure("Ready 失败");
+            return MeetingMessage.Failure("Ready 失败(无需调用)");
         }
 
         #endregion
@@ -378,7 +383,7 @@ namespace Tubumu.Meeting.Server
                 if (!pullResult.Sources.IsNullOrEmpty())
                 {
                     // Notification: produceSources
-                    SendNotification(pullResult.ConsumePeer.PeerId, "produceSources", new ProduceSourcesNotification
+                    SendNotification(pullRequest.PeerId, "produceSources", new ProduceSourcesNotification
                     {
                         Sources = pullResult.Sources
                     });
