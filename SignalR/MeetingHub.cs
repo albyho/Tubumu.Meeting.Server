@@ -107,12 +107,10 @@ namespace Tubumu.Meeting.Server
         {
             try
             {
-                if (await _scheduler.JoinAsync(UserId, ConnectionId, joinRequest))
-                {
-                    return MeetingMessage.Success("Join 成功");
-                }
+                _ = await _scheduler.JoinAsync(UserId, ConnectionId, joinRequest);
+                return MeetingMessage.Success("Join 成功");
             }
-            catch(MeetingException ex)
+            catch (MeetingException ex)
             {
                 _logger.LogError(ex.Message);
             }
@@ -135,10 +133,6 @@ namespace Tubumu.Meeting.Server
             {
                 // FIXME: (alby) 明文告知用户进入房间的 Role 存在安全问题, 特别是 Invite 模式下。
                 var joinRoomResult = await _scheduler.JoinRoomAsync(UserId, ConnectionId, joinRoomRequest);
-                if (joinRoomResult == null)
-                {
-                    return MeetingMessage<JoinRoomResponse>.Failure("JoinRoom 失败");
-                }
 
                 // 将自身的信息告知给房间内的其他人
                 var otherPeerIds = joinRoomResult.Peers.Select(m => m.PeerId).Where(m => m != joinRoomResult.SelfPeer.PeerId).ToArray();

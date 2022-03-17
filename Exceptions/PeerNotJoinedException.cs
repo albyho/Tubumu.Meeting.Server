@@ -2,7 +2,7 @@
 {
     public class PeerNotJoinedException : MeetingException
     {
-        public PeerNotJoinedException(string peerId) : base($"Peer:{peerId} is not joined.")
+        public PeerNotJoinedException(string tag, string peerId) : base($"{tag} | Peer:{peerId} is not joined.")
         {
 
         }

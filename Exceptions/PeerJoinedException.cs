@@ -1,8 +1,8 @@
 ﻿namespace Tubumu.Meeting.Server
 {
-    public class PeerNotJoinedException : MeetingException
+    public class PeerJoinedException : MeetingException
     {
-        public PeerNotJoinedException(string peerId) : base($"Peer:{peerId} is not joined.")
+        public PeerJoinedException(string tag, string peerId) : base($"{tag} | Peer:{peerId} was joined.")
         {
 
         }

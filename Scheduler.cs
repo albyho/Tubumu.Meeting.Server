@@ -55,7 +55,7 @@ namespace Tubumu.Meeting.Server
             _roomsLock.Set();
         }
 
-        public async Task<bool> JoinAsync(string peerId, string connectionId, JoinRequest joinRequest)
+        public async Task<Peer> JoinAsync(string peerId, string connectionId, JoinRequest joinRequest)
         {
             using (await _peersLock.WriteLockAsync())
             {
@@ -64,8 +64,7 @@ namespace Tubumu.Meeting.Server
                     // 客户端多次调用 `Join`
                     if (peer.ConnectionId == connectionId)
                     {
-                        _logger.LogError($"PeerJoinAsync() | Peer:{peerId} was joined.");
-                        return false;
+                        throw new PeerJoinedException("PeerJoinAsync()", peerId);
                     }
                 }
 
@@ -83,7 +82,7 @@ namespace Tubumu.Meeting.Server
 
                 _peers[peerId] = peer;
 
-                return true;
+                return peer;
             }
         }
 
@@ -628,7 +627,7 @@ namespace Tubumu.Meeting.Server
             {
                 if (!_peers.TryGetValue(peerId, out var peer))
                 {
-                    throw new Exception($"GetConsumerStatsAsync() | Peer:{peerId} is not exists.");
+                    throw new PeerNotExistsException("GetConsumerStatsAsync()", peerId);
                 }
 
                 CheckConnection(peer, connectionId);

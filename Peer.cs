@@ -172,11 +172,11 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("CreateWebRtcTransportAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("CreateWebRtcTransportAsync()");
 
                     var transport = await _room!.Router.CreateWebRtcTransportAsync(webRtcTransportOptions);
                     if (transport == null)
@@ -235,11 +235,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ConnectWebRtcTransportAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("ConnectWebRtcTransportAsync()");
 
                     using (await _transportsLock.ReadLockAsync())
                     {
@@ -248,6 +248,7 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"ConnectWebRtcTransportAsync() | Transport:{connectWebRtcTransportRequest.TransportId} is not exists");
                         }
 
+                        #warning 参数错误
                         await transport.ConnectAsync(connectWebRtcTransportRequest.DtlsParameters);
                         return true;
                     }
@@ -277,11 +278,11 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("CreatePlainTransportAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("CreatePlainTransportAsync()");
 
                     var transport = await _room!.Router.CreatePlainTransportAsync(plainTransportOptions);
                     if (transport == null)
@@ -291,7 +292,7 @@ namespace Tubumu.Meeting.Server
 
                     using (await _transportsLock.WriteLockAsync())
                     {
-                        // Store the WebRtcTransport into the Peer data Object.
+                        // Store the PlainTransport into the Peer data Object.
                         _transports[transport.TransportId] = transport;
                     }
 
@@ -325,11 +326,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("PullAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("PullAsync()");
 
                     var consumerRoom = _room!;
 
@@ -344,11 +345,11 @@ namespace Tubumu.Meeting.Server
                         {
                             using (await producerPeer._joinedLock.ReadLockAsync())
                             {
-                                producerPeer.CheckJoined();
+                                producerPeer.CheckJoined("PullAsync()");
 
                                 using (await producerPeer._roomLock.ReadLockAsync())
                                 {
-                                    producerPeer.CheckRoom();
+                                    producerPeer.CheckRoom("PullAsync()");
 
                                     var producerRoom = producerPeer._room!;
 
@@ -447,11 +448,11 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ProduceAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("ProduceAsync()");
 
                     using (await _transportsLock.ReadLockAsync())
                     {
@@ -536,11 +537,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ConsumeAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("ConsumeAsync()");
 
                     using (await _transportsLock.ReadLockAsync())
                     {
@@ -618,11 +619,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("CloseProducerAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("CloseProducerAsync()");
 
                     // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _producersLock.WriteLockAsync())
@@ -648,11 +649,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("CloseAllProducersAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("CloseAllProducersAsync()");
 
                     // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _producersLock.WriteLockAsync())
@@ -677,11 +678,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("CloseProducerWithSourcesAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("CloseProducerWithSourcesAsync()");
 
                     // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _producersLock.WriteLockAsync())
@@ -707,11 +708,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("PauseProducerAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("PauseProducerAsync()");
 
                     using (await _producersLock.ReadLockAsync())
                     {
@@ -736,11 +737,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ResumeProducerAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("ResumeProducerAsync()");
 
                     using (await _producersLock.ReadLockAsync())
                     {
@@ -765,11 +766,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("CloseConsumerAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("CloseConsumerAsync()");
 
                     // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _consumersLock.WriteLockAsync())
@@ -795,11 +796,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("PauseConsumerAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("PauseConsumerAsync()");
 
                     using (await _consumersLock.ReadLockAsync())
                     {
@@ -824,11 +825,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ResumeConsumerAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("ResumeConsumerAsync()");
 
                     using (await _consumersLock.ReadLockAsync())
                     {
@@ -853,11 +854,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("SetConsumerPreferedLayersAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("SetConsumerPreferedLayersAsync()");
 
                     using (await _consumersLock.ReadLockAsync())
                     {
@@ -882,11 +883,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("SetConsumerPriorityAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("SetConsumerPriorityAsync()");
 
                     using (await _consumersLock.ReadLockAsync())
                     {
@@ -911,11 +912,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("RequestConsumerKeyFrameAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("RequestConsumerKeyFrameAsync()");
 
                     using (await _consumersLock.ReadLockAsync())
                     {
@@ -940,11 +941,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("GetWebRtcTransportStatsAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("GetWebRtcTransportStatsAsync()");
 
                     using (await _transportsLock.ReadLockAsync())
                     {
@@ -954,7 +955,7 @@ namespace Tubumu.Meeting.Server
                         }
 
                         var stats = await transport!.GetStatsAsync();
-                        if(stats == null)
+                        if (stats == null)
                         {
                             return null;
                         }
@@ -975,11 +976,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("GetProducerStatsAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("GetProducerStatsAsync()");
 
                     using (await _producersLock.ReadLockAsync())
                     {
@@ -1009,11 +1010,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("GetConsumerStatsAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("GetConsumerStatsAsync()");
 
                     using (await _consumersLock.ReadLockAsync())
                     {
@@ -1043,11 +1044,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("RestartIceAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("RestartIceAsync()");
 
                     using (await _transportsLock.ReadLockAsync())
                     {
@@ -1077,13 +1078,13 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("JoinRoomAsync()");
 
                 using (await _roomLock.WriteLockAsync())
                 {
                     if (_room != null)
                     {
-                        throw new Exception($"JoinRoomAsync() | Peer:{PeerId} was in Room:{room.RoomId} already.");
+                        throw new PeerInRoomException($"JoinRoomAsync()", PeerId, room.RoomId);
                     }
 
                     _room = room;
@@ -1101,11 +1102,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("LeaveRoomAsync()");
 
                 using (await _roomLock.WriteLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("LeaveRoomAsync()");
 
                     // NOTE: 因为 Close 会触发 Emit("@close")，而 @close 的事件处理需要写锁。故使用写锁。
                     using (await _transportsLock.WriteLockAsync())
@@ -1190,7 +1191,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("SetPeerAppDataAsync()");
 
                 foreach (var item in setPeerAppDataRequest.AppData)
                 {
@@ -1223,7 +1224,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("UnsetPeerAppDataAsync()");
 
                 foreach (var item in unsetPeerAppDataRequest.Keys)
                 {
@@ -1256,7 +1257,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ClearPeerAppDataAsync()");
 
                 AppData.Clear();
 
@@ -1280,7 +1281,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("SetPeerInternalDataAsync()");
 
                 foreach (var item in setPeerInternalDataRequest.InternalData)
                 {
@@ -1303,7 +1304,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("GetPeerInternalDataAsync()");
 
                 peerInternalDataResult.InternalData = InternalData.ToDictionary(x => x.Key, x => x.Value);
                 return peerInternalDataResult;
@@ -1321,7 +1322,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("UnsetPeerInternalDataAsync()");
 
                 foreach (var item in unsetPeerInternalDataRequest.Keys)
                 {
@@ -1346,7 +1347,7 @@ namespace Tubumu.Meeting.Server
 
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("ClearPeerInternalDataAsync()");
 
                 InternalData.Clear();
 
@@ -1370,11 +1371,11 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("GetOtherPeersAsync()");
 
                 using (await _roomLock.ReadLockAsync())
                 {
-                    CheckRoom();
+                    CheckRoom("GetOtherPeersAsync()");
 
                     var allPeers = await GetPeersInteralAsync();
                     var query = allPeers.Where(m => m.PeerId != PeerId);
@@ -1395,7 +1396,7 @@ namespace Tubumu.Meeting.Server
         {
             using (await _joinedLock.ReadLockAsync())
             {
-                CheckJoined();
+                CheckJoined("GetRoleAsync()");
 
                 if(InternalData.TryGetValue(RoleKey, out var role) && role.GetType() == typeof(UserRole))
                 {
@@ -1428,19 +1429,19 @@ namespace Tubumu.Meeting.Server
             return _transports.Values.Any(m => m.AppData != null && m.AppData.TryGetValue("Consuming", out var value) && (bool)value);
         }
 
-        private void CheckJoined()
+        private void CheckJoined(string tag)
         {
             if (!_joined)
             {
-                throw new PeerNotJoinedException(PeerId);
+                throw new PeerNotJoinedException(tag, PeerId);
             }
         }
 
-        private void CheckRoom()
+        private void CheckRoom(string tag)
         {
             if (_room == null)
             {
-                throw new PeerNotInAnyRoomException(PeerId);
+                throw new PeerNotInRoomException(tag, PeerId);
             }
         }
 

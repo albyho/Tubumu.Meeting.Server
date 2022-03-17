@@ -1,8 +1,8 @@
 ﻿namespace Tubumu.Meeting.Server
 {
-    public class PeerNotInAnyRoomException : MeetingException
+    public class PeerInRoomException : MeetingException
     {
-        public PeerNotInAnyRoomException(string tag, string peerId) : base($"{tag} | Peer:{peerId} is not in any room.")
+        public PeerInRoomException(string tag, string peerId, string roomId) : base($"{tag} | Peer:{peerId} was in Room:{roomId} already.")
         {
 
         }
