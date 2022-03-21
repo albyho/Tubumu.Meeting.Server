@@ -248,7 +248,6 @@ namespace Tubumu.Meeting.Server
                             throw new Exception($"ConnectWebRtcTransportAsync() | Transport:{connectWebRtcTransportRequest.TransportId} is not exists");
                         }
 
-                        #warning 参数错误
                         await transport.ConnectAsync(connectWebRtcTransportRequest.DtlsParameters);
                         return true;
                     }
