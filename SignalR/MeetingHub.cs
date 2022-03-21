@@ -315,35 +315,36 @@ namespace Tubumu.Meeting.Server
 
         public async Task<MeetingMessage> Ready()
         {
-            if (_meetingServerOptions.ServeMode == ServeMode.Open || _meetingServerOptions.ServeMode == ServeMode.Invite)
+            if (_meetingServerOptions.ServeMode == ServeMode.Pull)
             {
-                try
-                {
-                    var otherPeers = await _scheduler.GetOtherPeersAsync(UserId, ConnectionId);
-                    foreach (var producerPeer in otherPeers.Where(m => m.PeerId != UserId))
-                    {
-                        var producers = await producerPeer.GetProducersASync();
-                        foreach (var producer in producers.Values)
-                        {
-                            // 本 Peer 消费其他 Peer
-                            CreateConsumer(UserId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
-                        }
-                    }
-
-                    return MeetingMessage.Success("Ready 成功");
-                }
-                catch (MeetingException ex)
-                {
-                    _logger.LogError(ex.Message);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Ready 调用失败.");
-                }
-
+                return MeetingMessage.Failure("Ready 失败(无需调用)");
             }
 
-            return MeetingMessage.Failure("Ready 失败(无需调用)");
+            try
+            {
+                var otherPeers = await _scheduler.GetOtherPeersAsync(UserId, ConnectionId);
+                foreach (var producerPeer in otherPeers.Where(m => m.PeerId != UserId))
+                {
+                    var producers = await producerPeer.GetProducersASync();
+                    foreach (var producer in producers.Values)
+                    {
+                        // 本 Peer 消费其他 Peer
+                        CreateConsumer(UserId, producerPeer.PeerId, producer).ContinueWithOnFaultedHandleLog(_logger);
+                    }
+                }
+
+                return MeetingMessage.Success("Ready 成功");
+            }
+            catch (MeetingException ex)
+            {
+                _logger.LogError(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ready 调用失败.");
+            }
+
+            return MeetingMessage.Failure("Ready 失败");
         }
 
         #endregion
