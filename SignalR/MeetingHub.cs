@@ -649,18 +649,31 @@ namespace Tubumu.Meeting.Server
                     });
                     return Task.CompletedTask;
                 });
+
                 producer.On("videoorientationchange", (_, obj) =>
                 {
                     // For Testing
                     //var videoOrientation= (ProducerVideoOrientation?)data;
 
-                    // Notification: videoorientationchange
+                    // Notification: producerVideoOrientationChanged
                     SendNotification(peerId, "producerVideoOrientationChanged", new ProducerVideoOrientationChangedNotification {
                         ProducerId = producer.ProducerId,
                         VideoOrientation = obj
                     });
                     return Task.CompletedTask;
                 });
+
+                // NOTE: For testing.
+                // await producer.enableTraceEvent([ 'rtp', 'keyframe', 'nack', 'pli', 'fir' ]);
+                // await producer.enableTraceEvent([ 'pli', 'fir' ]);
+                // await producer.enableTraceEvent([ 'keyframe' ]);
+
+                producer.On("trace", (_, obj) =>
+                {
+                    _logger.LogDebug($"producer \"trace\" event [producerId:{producer.ProducerId}, trace:{obj}");
+                    return Task.CompletedTask;
+                });
+
                 producer.Observer.On("close", (_, _) =>
                 {
                     // Notification: producerClosed
