@@ -67,17 +67,15 @@ namespace Tubumu.Meeting.Server.Authorization
         public Task<string> GenerateRefreshTokenAsync(int userId)
         {
             var randomNumber = new byte[32];
-            using (var rng = RandomNumberGenerator.Create())
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            var refreshToken = Convert.ToBase64String(randomNumber);
+            var cacheKey = CacheKeyFormat.FormatWith(userId);
+            _cache.SetStringAsync(cacheKey, refreshToken, new DistributedCacheEntryOptions
             {
-                rng.GetBytes(randomNumber);
-                var refreshToken = Convert.ToBase64String(randomNumber);
-                var cacheKey = CacheKeyFormat.FormatWith(userId);
-                _cache.SetStringAsync(cacheKey, refreshToken, new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(_tokenValidationSettings.ExpiresSeconds + _tokenValidationSettings.ClockSkewSeconds + _tokenValidationSettings.RefreshTokenExpiresSeconds)
-                }).ContinueWithOnFaultedHandleLog(_logger);
-                return Task.FromResult(refreshToken);
-            }
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(_tokenValidationSettings.ExpiresSeconds + _tokenValidationSettings.ClockSkewSeconds + _tokenValidationSettings.RefreshTokenExpiresSeconds)
+            }).ContinueWithOnFaultedHandleLog(_logger);
+            return Task.FromResult(refreshToken);
         }
 
         /// <summary>

@@ -57,11 +57,11 @@ namespace Tubumu.Meeting.Server
         /// </summary>
         private bool _closed;
 
-        private readonly AsyncReaderWriterLock _closeLock = new AsyncReaderWriterLock();
+        private readonly AsyncReaderWriterLock _closeLock = new();
 
-        private readonly Dictionary<string, Peer> _peers = new Dictionary<string, Peer>();
+        private readonly Dictionary<string, Peer> _peers = new();
 
-        private readonly AsyncReaderWriterLock _peersLock = new AsyncReaderWriterLock();
+        private readonly AsyncReaderWriterLock _peersLock = new();
 
         public Router Router { get; private set; }
 
