@@ -1224,6 +1224,8 @@ namespace Tubumu.Meeting.Server
 
                 // Notification: consumerScore
                 SendNotification(consumerPeerId, "consumerScore", new ConsumerScoreNotification {
+                    ProducerPeerId = producerPeerId,
+                    Kind = producer.Kind,
                     ConsumerId = consumer.ConsumerId,
                     Score = obj
                 });
@@ -1238,6 +1240,8 @@ namespace Tubumu.Meeting.Server
             {
                 // Notification: consumerClosed
                 SendNotification(consumerPeerId, "consumerClosed", new ConsumerClosedNotification {
+                    ProducerPeerId = producerPeerId,
+                    Kind = producer.Kind,
                     ConsumerId = consumer.ConsumerId
                 });
                 return Task.CompletedTask;
@@ -1247,6 +1251,8 @@ namespace Tubumu.Meeting.Server
             {
                 // Notification: consumerPaused
                 SendNotification(consumerPeerId, "consumerPaused", new ConsumerPausedNotification {
+                    ProducerPeerId = producerPeerId,
+                    Kind = producer.Kind,
                     ConsumerId = consumer.ConsumerId
                 });
                 return Task.CompletedTask;
@@ -1256,6 +1262,8 @@ namespace Tubumu.Meeting.Server
             {
                 // Notification: consumerResumed
                 SendNotification(consumerPeerId, "consumerResumed", new ConsumerResumedNotification {
+                    ProducerPeerId = producerPeerId,
+                    Kind = producer.Kind,
                     ConsumerId = consumer.ConsumerId
                 });
                 return Task.CompletedTask;
@@ -1268,6 +1276,8 @@ namespace Tubumu.Meeting.Server
 
                 // Notification: consumerLayersChanged
                 SendNotification(consumerPeerId, "consumerLayersChanged", new ConsumerLayersChangedNotification {
+                    ProducerPeerId = producerPeerId,
+                    Kind = producer.Kind,
                     ConsumerId = consumer.ConsumerId,
                     Layers = obj
                 });

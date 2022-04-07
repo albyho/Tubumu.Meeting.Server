@@ -141,6 +141,16 @@ namespace Tubumu.Meeting.Server
         /// <summary>
         /// 消费者 Id
         /// </summary>
+        public string ProducerPeerId { get; set; }
+
+        /// <summary>
+        /// 媒体类型
+        /// </summary>
+        public MediaKind Kind { get; set; }
+
+        /// <summary>
+        /// 消费者 Id
+        /// </summary>
         public string ConsumerId { get; set; }
     }
 
